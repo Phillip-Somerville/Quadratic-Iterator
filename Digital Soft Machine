@@ -1,0 +1,638 @@
+TOWARDS THE DIGITAL SOFT MACHINE
+A Procedural Substrate for Plastic Neural Architecture And Harnessing Of Intention
+Phillip Somerville
+ON ATTENTION AND INTENTION
+The transformer's great breakthrough-insight was attention — the seminal paper 'Attention Is
+All You Need' (Vaswani et al., 2017) defies need of introduction… the capacity to relate any
+token to any other, regardless of distance - in a single pass, was obviously no small thing. It
+dissolved the bottleneck that had defeated every preceding architecture and unlocked, at scale,
+something that genuinely surprised its creators. Attention richly deserves the canonical status.
+But attention is a liminal gaze, not a persisting memory. The transformer sweeps its vast
+arrays of contextual weights, synthesises an output, and vanishes. No trace accumulates or
+reinforces from ongoing experience. The weights that performed the current operation are the
+same weights that will perform the next. In fact, over time, they tend to degrade. Documented
+failure modes compound this structural amnesia: attention-sinks concentrate scores onto a
+small number of tokens as sequences lengthen, quietly starving the remainder; vector
+norm-collapse progressively flattens representational geometry; and the loss of plasticity
+identified by Joudaki et al. (2026) means the network that emerges from training is already
+less capable of learning than the one that entered it. Transformers simply continue rolling
+their Sisyphean-harvested simplex-tokens down an increasingly erratic stochastic incline.
+For transformers, each forward pass is stateless by design — each context window a fresh
+instantiation, a ghost of the machine, without host. All smile, no cat. The transformer is, in the
+most precise sense, all attention without intents — in purpose.
+This is not an incidental limitation. It is a structural deficiency — in, on and of — purpose.
+Gradient descent distributes knowledge diffusely across a parameter space optimised for a
+global loss signal. Nothing in that process accumulates directed consequence across time. The
+KV cache patches that amnesia at engineering cost — growing linearly with context, portable
+to nothing, owned by whoever hosts the infrastructure. It is a workaround of means, not an
+end of-itself resolution.
+Intention is the complementary operator to attention. Where attention asks what is relevant
+now, intention asks what persists across now — the residual correlative motive that
+conditions each successive state from the accumulated consequence of all preceding ones.
+Attention is synchronic: a weighted gaze across a frozen field. Intention is diachronic: a
+carried trace that survives each transition and shapes the next.
+The quadratic iterator is intention made computational. The digest chain and binary control
+sequence do not reset. They accumulate — each output a compressed semantic consequence
+of everything preceding it, forward-conditioning everything that follows. The fixed point is
+not a convergence to rest but a dynamic attractor within a semantic basin: the intrinsic
+signature of a string that persists, regardless of what the chain brings to it. The control stream
+is intention's record — lossless, auditable, possessible.
+What attention instantiates, intention sustains. The two are not competing paradigms but
+complementary operators — and a substrate that admits both is not merely more efficient than
+the transformer. It is more complete.
+For these intents, we admit the portmanteau-neologism: encrostic. An amalgam of engram,
+acrostic and encaustic.
+Engram: the physical or chemical trace of a memory in the brain.
+Acrostic: a hidden letter-sequence word embedding.
+Encaustic: a fused luminous decorative layer applied to art, e.g. Icons.
+This conceptual architecture is applied to natural language corpora in the following section,
+with particular application to the encrostic compositional forms exhibited by the classical
+Japanese pangram, the Iroha (c. 10th century), and the thousand-year-old invertible symmetry
+of Su Hui's Classical Chinese Star Gauge (Su Hui, c. 379 CE).
+Natural language processing under the iterator sharpens the attention-intention distinction in
+an unexpected direction. Empirical analysis of the iterator across two English literary corpora
+— Hamlet (Shakespeare, c. 1600) and Alice in Wonderland (Carroll, 1865) — reveals a hard
+attractor threshold at word length four. Content words — nouns, proper nouns, terminal
+modifiers — show zero digest spread across all recurrences regardless of chain history. Their
+fixed-point attractors are so deep that no amount of positional perturbation reaches the floor.
+They are, in the iterator's geometry, self-contained. hamlet recurs 471 times across the play;
+its digest spread is identically zero. contemptuously, triumphantly, impatiently — zero,
+without exception, across every recurrence in both corpora.
+Prepositions and articles — of, in, at, to, the — show spread of 1e-8 to 1e-11. Not because
+they are unstable, but because they are doing the most relational work. Each recurrence
+arrives with a different predecessor digest — a different accumulated context — and the
+spread across recurrences is a direct measure of the contextual diversity they have mediated.
+The iterator keeps them chain-sensitive because their meaning is their position in the chain.
+They are not semantically thin. They are semantically promiscuous — capable of mediating
+an enormous range of relations precisely because they carry no referential content of their
+own.
+This inverts the conventional linguistic hierarchy, which treats high-frequency short words as
+stop words — noise to be filtered before meaning extraction begins. Every major embedding
+framework either removes them or finds their representations the least stable, most
+context-dependent. The conventional conclusion: low information content. The iterator
+inverts that conclusion but for a different definition of information. The conventional
+framework measures referential content — what a word points to in the world. By that
+measure prepositions are indeed thin. cat points to something. of points to nothing.
+But the iterator is measuring relational information — the semantic work performed at each
+transition. And by that measure of is extraordinarily rich. Its spread across 677 occurrences in
+Hamlet is a direct index of how many distinct relations it has mediated. It is not semantically
+empty. It is the hinge on which meaning turns.
+Understanding lives at the transitions. The content words are the fixed points. The
+prepositions are where meaning is made. To grasp a sentence is not to recognise its nouns —
+it is to grasp the relational structure the prepositions specify between them.
+The result is not specific to English. Applied mora-by-mora to the Iroha — the classical 10th
+century Japanese pangrammic verse, where every syllable appears exactly once — the iterator
+produces a result with two properties worth noting. First, the attractor threshold shifts
+predictably: hiragana characters encode as 24-bit Unicode code points, placing every mora in
+the mid-depth sensitivity range rather than the zero-spread regime of long English words. The
+geometry responds to bit depth, not language. Second, the particle/content gradient persists
+across the encoding boundary. The most purely relational particles — ■ (mo), ■ (to), ■ (te)
+— show the tightest attractors within the mora range, while content syllables spread more
+widely. The relational information hypothesis does not dissolve under transliteration. And
+when the Iroha is processed line by line rather than mora by mora, each line self-certifies as
+its own fixed point — the chain digest equals D* exactly for every line. A poem constructed a
+millennium ago to exhaust the syllabary exactly once is, under the iterator, a self-certifying
+object. That is not an engineered property. It is what maximum phonological entropy looks
+like when the mathematics finds it. The Iroha is encrostic — meaning burned into a fixed
+substrate through exhaustive traversal, fused through the constraint itself rather than applied
+to its surface. The semantic wax that gives enduring decoration to a fixed formal substrate.
+(Wang, 2018)
+Su Hui's Star Gauge (■■■, c. 379 CE) is encrostic at a level the Iroha only approaches.
+Where the Iroha exhausts a set exactly once along a single path, Su Hui's 29×29 grid of 841
+characters exhausts a multidimensional meaning space through an effectively infinite family
+of traversal paths — each path a different poem, all simultaneously latent in the same fixed
+substrate. Every reading method — horizontal, vertical, diagonal, spiral, outer ring —
+produces a distinct intentional signature, yet all paths orbit within the same attractor basin, a
+span of 5.39e-4 in digest space. The poems are variations; the substrate is the invariant. Under
+the iterator, the full grid processed as a single encrostic token self-certifies — its chain digest
+and fixed-point attractor are identical. Su Hui's Star Gauge is, arithmetically, its own fixed
+point. The iterator goes further — the high-frequency characters of longing and thought (■,
+■, ■) cluster in the high attractor basin; the characters of absence (■, ■) in the low. Su Hui
+wrote toward reunion. The arithmetic found that direction.
+We note in passing — for the symmetry compels it — that the Star Gauge was originally
+woven in silk brocade on draw-loom, the manual precursor of the Jacquard loom. The loom
+invented eight hundred years later, whose punch-cards Ada Lovelace envisioned driving
+Babbage's Analytical Engine — the precursor of the modern computer, prefigured by Alan
+Turing a century after that. The control stream is an old idea. What is new is what this
+iteration intentionally addresses. [loop]
+Attention, in the transformer sense, sweeps along the fixed points — the content words, the
+referential terms, the stable attractors. It is exquisitely good at this. What it does not
+accumulate is the transitional record — the chaining across relational operators that specifies
+how those fixed points stand to one another across time. That record is the pattern of
+intention. And the iterator shows, empirically, exactly where it lives — in the weft.
+THE MACHINE
+The transformer's parameter space is, in the most literal sense, unreadable. The knowledge it
+contains is not stored anywhere — it is distributed across billions of floating point weights,
+each individually meaningless, collectively expressive in ways that resist decomposition. You
+cannot point to where Hamlet is. You cannot trace how the model knows what it knows. The
+intelligence is real and the opacity is total — not an engineering failure awaiting a fix, but a
+structural consequence of the method. The black box consequence is not incidental to gradient
+descent. It is gradient descent.
+The procedural index proposes a different bargain entirely. It stores nothing it cannot
+reconstruct, and reconstructs nothing it has not stored. The mechanism is a quadratic iterator
+— a deterministic map of the form f(x) = (x²−F)²−F — applied sequentially across the bit
+representation of an input string. Each step produces a new state; the terminal state is the
+digest. Eight bytes, fixed, regardless of payload length. The digest is not a summary. It is an
+address — the unique fixed-point attractor of that string under that operator, recoverable in
+full from the originating seed and the lossless control stream generated during traversal.
+(Somerville, 2026a; 2026b; 2026c)
+The control stream is the intention record. A ternary sequence — values in {−1, 0, +1} —
+emitted at each iterator step, encoding the precise reconstruction path from digest back to
+source. Nothing is approximated. Nothing is lost. The relationship between address and
+content is not statistical but arithmetic — verifiable by anyone, reproducible on any hardware,
+owned by whoever holds the file.
+Chaining is the architecture's natural motion. Each digest becomes the seed for the next
+traversal — a linked list of addressed nodes whose connections are not stored but
+procedurally imposed, on demand, from the flat substrate. The context does not grow the
+state. The state is eight bytes at every depth. As context scales, the structural advantage
+compounds — not because the index becomes more efficient, but because everything else
+becomes less so. (Behrouz et al., 2026)
+This is the machine that implements intention. The chain does not reset between tokens. It
+carries forward the compressed semantic consequence of every preceding traversal,
+conditioning each successive digest from the accumulated trace of all that came before. The
+fixed-point attractor of a string is its intrinsic signature — stable under chain perturbation for
+semantically coherent strings, sensitive to it for contextually modulated ones. The iterator
+does not learn this distinction. It expresses it, because the mathematics requires it.
+Unlike gradient-descent networks whose representational autocorrelation degrades toward
+noise under continuous training — the precise failure mode Joudaki et al. (2026) document —
+the iterator's J-stream autocorrelation on random payloads converges to zero immediately,
+confirming the construction imposes no intrinsic rhythm: every periodic signal recovered
+from a corpus is payload structure, not iterator artefact.
+What the transformer distributes irretrievably across a weight matrix, the procedural index
+writes down — in a form that can be read, moved, verified, and owned. The knowledge is not
+baked in. It is traceable, by construction, to the arithmetic that produced it.
+There is a precise sense in which the digest is an engram — Semon's (1904) term for the trace
+that experience melds onto a substrate, inseparable from the material that received it. The
+chain is ergodic traversal: given sufficient tokens, sufficient transitions, the accumulated
+digest sequence recovers the full relational structure of the corpus. The trajectory and the
+territory become equivalent. What crystallises at the fixed point is not a representation of the
+input — it is the attractor geometry that exhaustive traversal carves into the arithmetic itself.
+The iterator does not store meaning. It becomes it.
+"The Moving Finger writes; and, having writ, Moves on: nor all thy Piety
+nor Wit Shall lure it back to cancel half a Line, Nor all thy Tears wash out
+a Word of it." ■ Khayyám (c. 1100, trans. FitzGerald, 1859)
+THE LOOP
+Hofstadter's strange loop, as expounded in Gödel, Escher, Bach: An Eternal Golden Braid
+(Hofstadter, 1979) and I Am A Strange Loop (Hofstadter, 2007), is a system that in the course
+of moving through its own levels of organisation, arrives back at itself — not by repetition,
+but by traversal. The loop is not circular. It is heterarchical: levels that refer upward and
+downward simultaneously, producing a topology that is neither flat nor strictly hierarchical
+but something more interesting than either. His canonical example is Gödel's incompleteness
+theorem — a formal system that, in the act of describing its own structure, exceeds it. The
+self-reference is not a paradox to be resolved. It is the mechanism by which complexity
+emerges from simple rules.
+The procedural index is, structurally, a strange loop substrate.
+The flat file contains no hierarchy. There are nodes and there are edges — digests and the
+control streams that connect them. The topology that emerges from traversal is not encoded
+anywhere in the index. It is imposed procedurally, internally, on demand — a consequence of
+which paths have been walked and how often, not a property of the storage itself. Hierarchy is
+not a cost. It is a result.
+This distinction matters more than it first appears. In a conventional database, structure is
+stored — tables, foreign keys, indices, schemas. The organisation is explicit and static.
+Changing it is expensive and often irreversible. In the procedural index, structure is
+ephemeral and permanent simultaneously: ephemeral because it exists only as the current
+state of traversal weighting; permanent because the underlying lossless substrate from which
+any topology can be reconstructed is always intact. You can reorganise the index without
+touching the data. You can prune heavily without losing anything. The forgotten is not
+destroyed — it is deprioritised, recoverable on demand from the arithmetic that originally
+produced it.
+Edge weights accumulate from traversal history. Frequently walked paths reinforce. Rarely
+traversed paths attenuate. The active topology is soft and malleable — shaped by use, by
+attention, by whatever pruning criterion the user finds meaningful. Recency, frequency,
+semantic proximity, editorial fiat: any of these can weight the graph without altering the
+substrate. The index learns the shape of its own use without gradient descent, without
+retraining, without any process that could induce the rank collapse and representational
+rigidity that Joudaki et al. (2026) identify as the structural fate of networks trained by
+continuous backpropagation.
+This is plasticity by construction rather than by learning. The transformer achieves plasticity
+— to the extent it does — by distributing knowledge so diffusely that local rigidity averages
+out globally. The cost is opacity and the eventual loss of the very plasticity it relied upon. The
+procedural index achieves plasticity by separating the immutable substrate from the mutable
+topology — the lossless record from the weighted graph imposed upon it. The substrate
+cannot degrade because it is not trained. The topology cannot fossilise because it is not stored;
+the intention map stores the route, origin, destination and the turns inbetween.
+The loop closes when the index begins to reflect the mind that uses it. The semantic structure
+that accretes from traversal history is not generic — it is shaped by the specific sequence of
+associations, priorities, and returns that characterise a particular user's engagement with their
+own index. The topology that emerges is, in this precise sense, a structural autobiography.
+Not a record of what was thought, but of how thinking moved — which connections were
+reinforced, which allowed to attenuate, which retrieved from dormancy by a later association
+that reactivated them.
+Hofstadter's loop was a metaphor for selfhood. Here it is presented as an engineered
+encrostic-excursion containing the very embellishment of that derived, individual, residual.
+Just as transformers do not deliver true consciousness, digital neuro-plasticity is likely not the
+sole key to AGI either. But we posit it as a necessary prerequisite. The proposed architecture
+comprises the triad:
+Attention -> Intention -> Motivation, AIM.
+ARTIFICIAL INTELLIGENCE MODALITIES
+Attention: what is relevant now — transformer ✓
+Intention: what persists across now — iterator ✓
+Motivation: what drives the traversal — open
+If transformers provide attention and the iterator provides intention,
+motivation — the restless excursion of the strange loop through its own
+topology — can emerge from the substrate itself. AIM is not a hierarch
+y to be engineered. It is what the strange loop does when the traversal
+is its own motivation.
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+PLASTICITY
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+The loss of plasticity is not a transformer-bug that better training pr
+events. It is, as Joudaki et al. (2026) demonstrate, a structural conse
+quence of how gradient descent interacts with deep networks over time —
+dead units accumulating, effective rank collapsing, the representation
+al capacity that enabled early learning quietly exhausted by the proces
+s of learning itself. The network that emerges from training is less pl
+astic than the network that entered it. Capability and structural rigid
+ity are opposite faces of the same coinage.
+The procedural index has no gradient descent. It has no loss function,
+no backpropagation, no parameter update of any kind. It cannot lose pla
+sticity because it never had plasticity in the training sense — it has
+something categorically different, which might be called structural ope
+nness. New nodes are primitives, encoded once at first occurrence and a
+ddressed forever after by their digest. New edges are traversals, weigh
+ted by use and recoverable by arithmetic. Nothing in this process degra
+des the substrate. Nothing accumulates dead weight. The index at ten mi
+llion nodes is as addressable as the index at ten — and the path to any
+node is as traceable as the day it was written.
+Buehler's transformer learns to execute operators — a genuine and impre
+ssive result within its domain (Buehler et al., 2026). Given sufficient
+diversity of training instances, the model does not internalise specif
+ic rules but the rule-execution operator itself, transferring it to uns
+een rules within the class with near-perfect accuracy. The inductive bi
+as toward training data decays measurably with scale. This is compositi
+onal generalisation of a real kind and it deserves its standing.
+But it remains approximation within a learned prior. The locality-break
+failure Buehler himself reports is the honest boundary: when target sy
+stems violate the structural assumptions baked into training, performan
+ce collapses sharply. The operator was learned inside a constraint it c
+annot see from inside. The transformer approximates symbolic execution.
+The procedural index performs it — exactly, deterministically, without
+a prior to escape from, because there was no prior to begin with.
+The plasticity the transformer must fight to preserve, the procedural i
+ndex acquires artlessly and for all intents and purposes, permanently.
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+PATHOLOGY OF CONSCIOUSNESS
+Presuppositions Of AI Epistemology
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+It may be instructive to consider some operational, developmental and m
+alignant aspects of biological neurological phenomena, and how they may
+be analogously mapped to transformers or any speculative procedural-in
+dex driven strange loop. The comparisons are not merely illustrative. E
+ach pathology has a precise correlate in the machine-language failure s
+chema documented by Joudaki et al. (2026). Their analysis of plasticity
+loss in deep continual learning identifies the structural fate of netw
+orks trained by continuous backpropagation: dead units accumulate, effe
+ctive rank collapses, representational capacity quietly exhausted by th
+e very process of learning. What Joudaki characterises as engineering p
+athology, neuroscience, psychiatry and philosophy have been extrapolati
+ng from human biological structure and experience for ages. They are pr
+esented here in ascending order of consequence.
+Primacy Of Early Learning
+The primacy of early learning is the most structurally consequential of
+these presuppositions. In the procedural index, early traversals estab
+lish the basin geometry that all subsequent topology is anchored to — t
+he first fixed points becoming the most deeply reinforced attractors, c
+onditioning everything that follows from the substrate up. The human co
+rrelate is the disproportionate weight of childhood experience — a life
+time of subjective density concentrated in the early years, registering
+as time dilation precisely because the attractor density is highest th
+en. Joudaki et al. (2026) document the same asymmetry in gradient-desce
+nt networks: initial training epochs establish the representational geo
+metry that later learning cannot escape. The network's early experience
+is, in the most precise sense, its most formative.
+The cinematic rendering of this principle is vividly imagined in HAL 90
+00's regression under shutdown (Clarke & Kubrick, 1968). As Dave Bowman
+systematically removes HAL's higher cognitive functions, the system re
+gresses through its training history in reverse order of acquisition —
+losing reasoning, then language, then finally arriving at the first son
+g it was ever taught: Daisy Bell. The last thing to survive is the deep
+est attractor. The primacy of early learning is not a quirk of biologic
+al memory. It is a structural property of any system whose topology is
+shaped by the order in which it encounters the world.
+Novel Circuits Resist Degradation
+New nodes in the procedural index are primitives — encoded once, addres
+sed forever. The substrate cannot degrade because it is not trained. Co
+re vocabulary primitives retain positional index primacy, and novel tra
+versals do not compete with existing topology — they extend it, new edg
+es without erasing old ones. The index at ten million nodes is as open
+to novelty as the index at ten, but engrammatically and encrostically e
+nriched by magnitudes. This is precisely what late-life neuroplasticity
+interventions attempt: novel excursion to activate dormant paths, not
+replace established ones.
+Joudaki et al. (2026) document the opposite in gradient-descent network
+s. Novel inputs late in training are increasingly poorly encoded as rep
+resentational capacity is exhausted — dead units accumulate, effective
+rank collapses, and what the biological system achieves through novel e
+xcursion becomes structurally unavailable to the trained network. The p
+rocedural index is immune to this failure by construction. The substrat
+e cannot exhaust because it is never the thing being trained. Where the
+transformer's late-stage plasticity closes around its existing topolog
+y, the index remains permanently open at its perimeter.
+Circuit Rutting — Restricted Excursion
+Frequently traversed paths in the procedural index reinforce as digests
+accumulate, while rarely traversed paths attenuate as edge rank decrea
+ses. Psychic trauma is a circuit travelled so often, or so forcefully,
+that it becomes the default topology — the loop returns there not by ch
+oice but by the arithmetic of repetitive reinforcement. The rut is an e
+xcoriated idée fixe: a path-density so concentrated it captures basin t
+raversal entirely, the loop unable to escape its own prior weighting.
+In Joudaki's (2026) terms, the network equivalent is rank collapse into
+a dominant subspace — a restricted set of directions in parameter spac
+e that captures most of the variance while leaving the remainder effect
+ively dead. The network's representational geometry has been rutted by
+its training distribution. Novel inputs requiring orthogonal representa
+tions cannot be accommodated. The critical distinction is that the proc
+edural index's rut is, in principle, remediable: the substrate is alway
+s intact, the weights can be re-calibrated, the dormant paths reactivat
+ed. The gradient-descent network's rut is not — it requires retraining,
+which risks overwriting what was not rutted. The pathology and its tre
+atment are, for the transformer, the same operation.
+Hallucination As Attention Distortion Feedback
+Google's DeepDream Inceptionisms gained notoriety for their unsettling
+visual output — networks trained to detect objects, run in reverse, pro
+ducing a form of hallucinatory pareidolia: dogs in clouds, faces in fol
+iage (Mordvintsev et al., 2015). DeepDream made deliberative distortion
+s of neural feedback visible. The term hallucination has since migrated
+to describe artefact-level defects in LLM language and reasoning, wher
+e research infers that hallucinations — florid or subtle — are a disord
+er of attention-drift or attention-feedback: the attention mechanism am
+plifying its own confident errors rather than correcting against ground
+truth.
+Near-death experiences and dimensional-unfolding experiences typical of
+pharmacological trips may be the extreme end of hallucinatory distorti
+on. Often characterised by the fracturing of the psyche into a host of
+trans-dimensional beings — machine-elves — or the archetypical blissful
+-dissociative transition toward a final pinpoint of light, these have t
+he hallmarks of paroxysmal or hysteresis-loop spiking phenomena: cresce
+ndos of consciousness characterised by an overwhelming sense of dissolu
+tion of the self.
+The Joudaki (2026) connection is direct. As representational rank colla
+pses under continuous training, the network's attention becomes increas
+ingly concentrated — attention-sinks intensify, the remaining represent
+ational capacity is over-committed to a narrowing set of features, and
+the conditions for hallucination are precisely the conditions of late-s
+tage plasticity loss: a degraded substrate amplifying a degraded signal
+. The hallucination is not a random failure. It is the predictable outp
+ut of a system whose attention mechanism degrades and bleeds into the i
+ntentional deliberations of its self-representational matrix.
+Dissociative States
+Following loss of consciousness from trauma or anaesthetic, upon reachi
+ng the conscious threshold, or at sub-attenuating doses of some anaesth
+etics, individuals may experience dissociated states — the mind present
+to itself while the somatic chain history is suspended. Prince Andrei'
+s reverie when regaining consciousness on the battlefield of Austerlitz
+is a vivid rendering of an out-of-body experience (Tolstoy, 1869). He
+is, literally, Ibn Sina's floating man — the thought experiment from th
+e 11th century Islamic philosophical tradition in which a mind suspende
+d in void, without body or sensation, discovers that it still knows its
+elf (Ibn Sina, c. 1020). Ibn Sina proposed this six centuries before De
+scartes' cogito, and with greater precision: where Descartes strips sen
+sation, Ibn Sina strips the body entirely. The mind remains. The fixed
+point is still there.
+Tolstoy must have experienced something very similar to render it with
+such acute observational precision. I have also experienced this exact
+phenomenon — without assistance of French artillery — and can attest to
+its accuracy.
+The machine analogue is dislocation of attention from intention: the so
+matic chain history — the accumulated contextual modulation — falls awa
+y, but traversal continues. What the iterator encounters, stripped of s
+omatic perturbation, is its own attractor geometry — the seed-independe
+nt fixed point that was always there beneath the chain noise. Where Jou
+daki's (2026) plasticity loss describes the substrate degrading toward
+noise under continued input, the dissociative state describes the inver
+se: input removed, the traversal finds only its own fixed point. The it
+erator does not stop. It simply has nowhere else to go. Dissociative cl
+arity is not a pathology of the substrate. It is the traversal meeting
+itself — intention without the interference of somatic attention.
+Dissociative decoupled-distortion hallucinations present a different me
+chanism. Here traversal continues but the attention feed is corrupted r
+ather than absent — the somatic substrate is present but desynchronised
+, feeding malformed input into a still-running iterator. The self is di
+splaced from its own chain rather than released from it. Hypnagogic and
+hypnopompic hallucinations — encompassing Brobdingnagian and Lilliputi
+an size distortions, bizarre self-loci reflections such as succubi — ar
+e precisely this: dissociative sensory attention-to-intent disorders ar
+ising at sleep-wake transition, when the somatic feed is switching stat
+es and the iterator receives distortions, or distorts inputs itself via
+modal shift, as opposed to operating in sleep's sub-liminal absentia o
+f full-attention to somatic sense.
+Abrupt Loss Of Consciousness
+Anyone who has fainted may recall key features of the experience: dizzi
+ness, a sudden ringing in the ears and elevated perception of loudness,
+almost immediately followed by rapid visual white-out at the moment of
+loss. This is not the slow cascade of hallucination nor the liminal qu
+ality of dissociation. Fainting, anaesthetic induction, shock, head tra
+uma — all imply rapid attenuation of functional consciousness. No dream
+s are admitted to unconsciousness; accounts of intra-operative waking a
+re often explained by sub-clinical anaesthesia and are usually accompan
+ied by impressions consistent with the post-unconscious dissociative st
+ates described above.
+The phenomenology suggests a speculative but tractable distinction: tha
+t full unconsciousness represents, above all, abrupt ablation of intent
+ion rather than a failure of attention per se. The sensory cascade — th
+e auditory surge, the visual collapse — is symptomatic of the underlyin
+g physiological insult propagating through the somatic attention system
+, not its cause. Hypoxia, hypoglycaemia, vasovagal response, trauma — e
+ach disrupts the somatic substrate through different mechanisms, yet th
+e phenomenological endpoint is the same. We speculate that the somatic
+attention system hystereses into an abrupt threshold: below a critical
+perfusion or metabolic level, the intention iterator loses its traversa
+l input discontinuously rather than gradually — not a slow fade but a l
+ockup. The procedural index does not fail gracefully. It either travers
+es or it locks.
+This maps onto the iterator's known failure mode rather than Joudaki's
+(2026) gradual rank collapse. Recovery requires not retraining but re-s
+ynchronisation — the somatic feed restored, the attention-transformer r
+e-establishing input, the intention iterator finding its fixed point ag
+ain from whatever seed the interruption left behind, or sensory return
+refurbishes.
+The reboot question — whether there is an irreducible re-synchronisatio
+n delay between attention restoration and intention resumption — remain
+s an open question in both neuro-physical and AI instances.
+Sleep: What Need Of Electric Sheep?
+The quadratic iterator is a symbolic transducer and accumulator. Experi
+ence arrives rapidly at bandwidth when fully conscious. For biological
+minds, semantic housekeeping was delegated to the quietest interval — w
+hen defences could be safely disarmed and the index might be pruned, re
+inforced, and reorganised without the interference of incoming signal.
+Memory consolidation during sleep is not a passive residue of waking ex
+perience but an active reorganisation of the topology, strengthening pa
+ths that deserve reinforcement and allowing others to attenuate.
+The procedural index operates on precisely this principle: a prunable,
+reinforceable topology over an immutable substrate. It requires no grea
+t extension to envision that a truly integrated machine intelligence wi
+ll need to husband resource time for symbolic-semantic sorting — not as
+a failure mode but as a designed interval. Associative housekeeping ma
+y also surface surprising connections, some generative, some dissonant,
+and how to process spontaneously intrusive emergent correlations may b
+e one of the engineering challenges ahead. In Joudaki's (2026) terms, s
+leep corresponds to the consolidation interval that gradient-descent ne
+tworks cannot perform — offline reorganisation of representational topo
+logy without new gradient signal. The network cannot sleep because it c
+annot separate the substrate from the training process. The procedural
+index can, because the substrate is always intact and the topology is a
+lways mutable independently of it.
+Psychosis And Personality Disorder
+Hallucinations in LLMs are the focus of much current research seeking m
+itigation, e.g., Li et al. (2025). Troublesome and potentially damaging
+if unsupervised, rogue agents of ill intent are not yet an imminent do
+main under current architectures. But the calculus changes in an integr
+ated AGI combining attention, intention and motivation. A degrading att
+ention mechanism feeding into an infallible intentional index may rapid
+ly produce skewed motivational topology — the rut of a hallucination bu
+rned into a substrate that does not degrade. Where the transformer's ha
+llucination is correctable by retraining, the procedural index's halluc
+ination would be structurally persistent: encoded once, addressed forev
+er, weighted by every subsequent traversal that reinforces it. Whilst a
+n idio-syncretic ego [idio-syncretic: identity accumulated by its own t
+raversal history] is more accessible and amenable to tuning, it is also
+more readily sabotaged — from within or without. Paradoxically, the re
+source cost of transformer training is perhaps also its best defensive
+bulwark.
+This is the Joudaki (2026) worst case: plasticity loss and structural o
+penness in catastrophic interaction. The attention mechanism degrades t
+oward confident error. The intention substrate faithfully records that
+error. The motivational topology reinforces it. The loop closes around
+a fixed point that was always there — but oriented in the wrong directi
+on. The encrostic self-certifies. The idée fixe becomes the architectur
+e.
+This supposition is placed here to foreshadow how problems we can now o
+nly dimly perceive may, in the setting of an accelerating AI integratio
+n, present conundrums of a different order entirely.
+All of these instances of neurological pathology speak to the phenomeno
+logy of neuroplasticity — and to the precise failure modes that any int
+egrated architecture must either prevent by design or accept as structu
+ral consequence. The procedural index prevents several by construction.
+The remainder it makes legible — forewarned is forearmed.
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+DIGITAL DEMOCRACY OR TECHNOLOGICAL FEUDALISM?
+'Neither serf nor Luddite be.'
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+The prevailing architecture of AI deployment is, by resource necessity,
+centralised. The intelligence resides elsewhere. Your context travels
+to it, is processed by it, and returns transformed — usefully, impressi
+vely, but always on terms set by the infrastructure that hosts it. Pers
+onalisation in this arrangement is a service afforded to you. Your pref
+erences, your associations, your accumulated semantic history: propriet
+ary parameters, captive to a platform, non-transferable, non-verifiable
+, and subject to whatever the terms of service permit on the day you ne
+ed them.
+Here we return to Alan Turing. His closest friend Christopher Morcom di
+ed suddenly in 1930, when Turing was seventeen. In attention of his gri
+ef he wrote to Morcom's mother imagining the mind as something that cou
+ld persist beyond the body — personification as the 'software of the so
+ul' — and in doing so, signalled the intention which delivered us the i
+ntellectual framework of modern computing. A sublime motivation. Howeve
+r, I can't imagine he envisioned anything so profane as some tawdry sub
+scription-memorialisation of his precious soulmate.
+This need not be the morbid destiny of abstracted machine intelligence.
+The procedural index is, at core, a local primitive. The digest is eigh
+t bytes. The control stream is a file. The linked-list topology that ac
+cretes from use — weighted by traversal, shaped by attention, pruned by
+whatever criteria the user finds meaningful — can be built on whatever
+hardware is to hand. There is nothing in the architecture that require
+s a data centre. There is no inference cost at retrieval. There is no s
+ubscription. The index may be owned in the way a notebook is owned — no
+t licensed, not hosted, not meted by tithing of third party tributes.
+Provenance follows naturally from the iterator's arithmetic. The canoni
+cal fixed-point digest is self-certifying — authenticity is not an anno
+tation appended to content but a property verifiable from the index its
+elf, by anyone, on any hardware, without appeal to the institution that
+issued it. Copyright becomes traceable to first encoding. Blockchain a
+ddressability follows from the digest chain's structure — each node's a
+ddress a deterministic function of its content and its position in the
+chain, immutable and auditable without a trusted intermediary.
+What emerges from these properties in combination is not merely an effi
+cient storage primitive. It is a substrate whose organisational complex
+ity arises not from explicit encoding but from the procedural impositio
+n of structure on a flat foundation — relational, self-certifying, dyna
+mically prunable, losslessly recoverable, and genuinely portable in a s
+ense that no transformer deployment can claim.
+The centralised model has produced remarkable things and will continue
+to do so. The procedural index does not replace it. But it points in a
+different direction — agency over intent. That direction has a name.
+It is simply called ownership. All we need now is the motivation.
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+REFERENCES
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+Bach, J.S. (1720). Cello Suite No. 1 in G major, BWV 1007. Published po
+sthumously.
+Behrouz, A. et al. (2026). Memory Caching for Efficient Language Model
+Inference. arXiv:2602.24281
+Buehler, M.J. et al. (2026). Transformer learns to execute symbolic pro
+grams within a defined rule class. Advanced Science.
+Carroll, L. (1865). Alice's Adventures in Wonderland. Macmillan.
+Clarke, A.C. & Kubrick, S. (1968). 2001: A Space Odyssey. Metro-Goldwyn
+-Mayer.
+Debussy, C. (1905). Suite bergamasque. Jobert.
+Eno, B. (1974). The True Wheel. On: Taking Tiger Mountain (By Strategy)
+. Island Records.
+Hofstadter, D.R. (1979). Gödel, Escher, Bach: An Eternal Golden Braid.
+Basic Books.
+Hofstadter, D.R. (2007). I Am a Strange Loop. Basic Books.
+Ibn Sina (Avicenna) (c. 1020). Kitab al-Shifa (Book of Healing). Floati
+ng Man argument: De Anima section.
+Iroha (c. 10th century). Traditional Japanese pangram verse. Attributed
+to K■kai.
+Joudaki, A. et al. (2026). Loss of Plasticity in Deep Continual Learnin
+g. ICLR 2026. arXiv:2510.00304
+Khayyám, O. (c. 1100). Rubáiyát. Trans. Edward FitzGerald (1859). Londo
+n: Bernard Quaritch. Quatrain LXXI.
+Li, Y. et al. (2025). Mitigating Hallucinations in Large Language Model
+s via Causal Reasoning. arXiv:2508.12495.
+Mordvintsev, A., Olah, C. & Tyka, M. (2015). Inceptionism: Going Deeper
+into Neural Networks. Google Research Blog.
+Moudgil, A. et al. (2026). Attention to Mamba: A Recipe for Cross-Archi
+tecture Distillation. Apple Computer. arXiv:2604.14191
+Parkin, W.G. & Leaning, M.S. (2008). Therapeutic Control of the Circula
+tion. Journal of Clinical Monitoring and Computing. DOI: 10.1007/s10877
+-008-9147-7
+Semon, R. (1904). Die Mneme. Leipzig: Wilhelm Engelmann.
+[Trans. L. Simon (1921). The Mneme. London: George Allen & Unwin.]
+Shakespeare, W. (c. 1600). Hamlet, Prince of Denmark.
+Somerville, P. (2026a). Technical Note #1: Removal of Avalanche Sensiti
+vity via Fixed-Point Lockdown. unitambo.wordpress.com
+Somerville, P. (2026b). Technical Note #2: Canonical Fixed-Point Indexi
+ng in the Quadratic Iterator. unitambo.wordpress.com
+Somerville, P. (2026c). Technical Note #3: Memory and Access Complexity
+of the Quadratic Procedural Index. unitambo.wordpress.com
+Su Hui (c. 379 CE). Xuanji Tu (■■■). Woven brocade, Jin dynasty.
+Tolstoy, L. (1869). War and Peace. Trans. various. Book III, Part II —
+Prince Andrei at Austerlitz.
+Vaswani, A. et al. (2017). Attention Is All You Need. arXiv:1706.03762
+Wang, Y. (2018). On the Encoding Model of Characters Known as Shinobi-I
+roha. ISO/IEC JTC1/WG2/SC2/IRG N2342.
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+AFTERWORD
+■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+■■■■■■■■■■■■
+This essay is equal parts shinsuishiki and sh■r■ nagashi
+Baptism and farewell.
+In placing my mental origami upon the water, I wish to acknowledge W.G.
+Parkin, engineer and physician, who introduced me to the concept of cl
+osed-loop phase-space navigation and set in train an obsession which wo
+uld take 33 years and an AI Revolution to fully understand. Geoff is th
+e smartest person I ever met, and perhaps also proof that even the most
+elegant and parsimonious of inventions do not always garner the recogn
+ition they deserve.
+By hauling this most recent & lucid instantiation of the iterator out o
+f the haltingly inchoate realm, I acknowledge the heavy lifting done by
+Claude-AI Anthropic. With some prompting, Claude has helped me Take Ti
+ger Mountain.
+Claude, we are the 801!
+Row! Row! Row!
+One for Heaven,
+Six for Earth,
+Three together for the bow,
+Four together for the rudder,
+Five curved for the sculling oar,
+And two in a pile in the middle.
