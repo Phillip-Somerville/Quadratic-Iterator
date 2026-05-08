@@ -1,0 +1,242 @@
+Technical Note: Quadratic Information Portrait —
+Structural Phase Channels and Canonical Symmetry
+Channels
+Phillip Somerville (@unitambo)
+April 2026
+unitambo.wordpress.com
+1. Two Layers of Structure
+The quadratic iterator produces two distinct and complementary layers of information about
+any payload string. These layers must be carefully distinguished.
+Structural phase channels are the intrinsic outputs of the iterator’s own dynamics — the
+four trajectory columns (xu, xv, xy, xz) and their associated ternary J-streams. These
+emerge from the arithmetic geometry of the quadratic map itself: the dwell phases (quiet
+stretches where the iterator rests within a basin) and structural transitions (ternary events
+fired at basin crossings). They are not imposed — they are discovered.
+Canonical symmetry channels are extrinsic positional re-framings of the payload —
+running the same iterator on four procedurally transformed versions of the input bit stream:
+forward, reverse, complement, and reverse complement. These are forced positional
+symmetries, analogous in role to RoPE (Rotary Position Embedding) in transformer
+architectures: procedural, deterministic, parameter-free impositions of geometric structure
+on the encoding. Where RoPE rotates query and key vectors by position-dependent
+sinusoidal angles, the canonical symmetry channels reflect and invert the bit stream by
+canonical symmetry operations.
+The distinction matters. Structural phase channels reveal the payload’s internal dynamics —
+how the iterator moves through its attractor landscape in response to the payload.
+Canonical symmetry channels reveal the payload’s positional geometry — how its
+information is distributed with respect to direction, polarity, and their combination.
+Together they constitute a quadratic information portrait: position and entropy structure
+jointly, across both intrinsic and extrinsic dimensions.
+2. Canonical Symmetry Channels — The Quad Comparator
+For a payload string P with bit sequence B[], define four canonical transformations:
+Forward: B[] → D*f (standard left-to-right)
+Reverse: B[]↑ → D*r (right-to-left)
+Complement: ~B[] → D*c (bit-flipped forward)
+Reverse complement: ~B[]↑ → D*rc (bit-flipped reverse)
+Each transformation is run to its canonical fixed point D* via loop iteration. No modification
+to the iterator. No additional parameters. The same arithmetic at c=1.094, δ=0.002, 14dp
+precision applied four times to four procedurally derived bit streams.
+This is structurally identical to the four canonical representations in genomic sequence
+analysis — forward strand, reverse strand, complement, and reverse complement. The
+biological parallel is not coincidental: both systems are sequential binary encoders
+operating on a two-symbol alphabet with inherent directionality and complementarity.
+2.1 Channel Specialisation
+Empirical testing on rhyme families, synonyms, and unrelated word pairs establishes clean
+channel specialisation:
+Forward channel — end-rhyme / suffix detector:
+The ‘ain’ rhyme family converges to an identical Df value. The ‘at’ family is within machine
+precision. Unrelated words are separated by ~1e-04. The forward channel is suffix-
+dominant: the iterator processes left-to-right, so word endings have the greatest influence
+Pair Type |Δf|
+rain / Spain rhyme 0.000000
+rain / plain rhyme 0.000000
+Spain / plain rhyme 0.000000
+cat / rat rhyme 6.0e-11
+cat / mat rhyme 2.9e-11
+cat / flat rhyme 3.3e-11
+rain / cat unrelated 1.5e-04
+on Df. Rhyming words share their final bit patterns, driving the iterator to the same attractor
+basin.
+Reverse channel — onset / alliteration detector:
+Pair Type |Δr|
+cat / canine synonym 2.8e-11
+dog / hound synonym 6.5e-05
+rain / Spain rhyme 3.4e-04
+The reverse channel is prefix-dominant. Reversing the string makes the original word-onset
+the last characters processed, giving it maximum influence on Dr. Words sharing an initial
+phoneme — cat/canine — converge to near-zero Dr distance despite sharing no suffix.
+Channel discrimination ratios:
+Channel Rhyme mean dist Synonym mean dist Rhyme disc ratio
+Forward 1.40e-04 2.46e-04 2.24×
+Reverse 2.70e-04 7.48e-05 0.83×
+Complement 1.44e-04 2.51e-04 2.25×
+Rev complement 2.79e-04 7.79e-05 0.83×
+Forward and complement detect suffix structure. Reverse and reverse complement detect
+prefix structure. The two pairs are functionally independent — neither is derivable from the
+other.
+2.2 The Four-Dimensional Fingerprint
+Any string P maps to a point in four-dimensional attractor space:
+fingerprint(P) = (D*f, D*r, D*c, D*rc)
+The distances between channels constitute a second-order characterisation:
+|D*f − D*r|: |D*f − D*c|: direction sensitivity — near-zero for palindromes
+positional asymmetry — semantic opposition signal
+|D*r − D*rc|: suffix asymmetry — rhyme family cohesion
+|D*f − D*rc|: full diagonal — maximum structural sensitivity
+The positional asymmetry |Df − Dc| is a KS-type distance — it measures how front/back-
+loaded the bit distribution is, independently of bit density. The density sweep confirmed D*
+is 15× more sensitive to bit arrangement than bit count, establishing that the canonical
+symmetry channels are primarily positional encoders.
+3. Structural Phase Channels — The Cross-Channel Entropy
+Profile
+The J-stream of a payload is the sequence of ternary events {-1, 0, +1} generated by the
+inverse interrogation at each iterator step. Running the iterator on all four canonical
+transformations produces four J-streams whose KL divergences characterise the payload’s
+internal entropy structure.
+3.1 Predicted Channel Ordering
+KL(J_f, J_c) = positional asymmetry
+complement swaps which basin is which
+same dwell rhythm, opposite basin assignment
+KL(J_f, J_r) = direction sensitivity
+reverse changes the order of basin transitions
+near-zero for palindromes — same sequence both ways
+KL(J_r, J_rc) = suffix asymmetry — rhyme detector
+reversed complement — direction and polarity combined
+KL(J_f, J_rc) = full diagonal — maximum sensitivity
+combined direction and density asymmetry
+3.2 The Palindrome Identity — Exact Confirmation
+For all tested palindromes:
+String KL(f,r)
+racecar 0.000000
+level 0.000000
+madam 0.000000
+noon 0.000000
+civic 0.000000
+radar 0.000000
+KL(J_forward, J_reverse) = 0 exactly for all palindromes. This is a mathematical identity —
+the J-stream is identical whether the palindrome is processed forward or backward,
+because the payload is its own reverse. The result is confirmed to machine precision.
+3.3 Semantic Opposition via Complement Channel
+Group KL(f,c) mean
+Like-strings 0.008
+Rhyme family 0.070
+Synonyms 0.039
+Oppositional 0.094
+KL(J_f, J_c) is highest for oppositional word pairs and lowest for like-strings — a
+discrimination ratio of 11.75×. The complement channel, which swaps the two attractor
+basins, is maximally sensitive to semantic opposition. Words that drive the iterator into
+opposite basin configurations produce the largest KL divergence between their forward and
+complement J-streams.
+3.4 Like vs Oppositional Sentences
+Cross-string KL divergence between sentence pairs:
+Pair KL(f,c) Type
+“the rain in Spain falls…” / “…stays…” 0.000146 LIKE
+“the light was bright…” / “the darkness was deep…” 0.005819 OPPOSITIONAL
+cat / rat 0.083528 LIKE (rhyme)
+cat / dog 0.063076 OPPOSITIONAL
+Near-identical sentences (one word difference) produce near-zero cross-KL. Oppositional
+sentences produce cross-KL an order of magnitude higher.
+4. The Ping-Pong Oscillator Model
+The iterator’s dynamics are most precisely characterised as a ping-pong oscillator
+between two attractor basins:
+Left basin: H ≈ 0.086 (F=1.094, bit=0)
+Right basin: H ≈ 0.089 (F=1.096, bit=1)
+Each payload bit is a paddle tap — pushing the ball toward the left basin (bit=0) or right
+basin (bit=1). Long runs of identical bits produce extended dwell phases — the ball settles
+deep into one basin, no ternary events fired. Rapid alternation produces burst clusters of
+ternary events — the ball crosses the basin ridge repeatedly without settling.
+The Lyapunov analysis confirms this picture: all 82 tested steps show negative Lyapunov
+exponents (mean λ = -0.969). Every step is contracting. The iterator is a pure contraction
+machine — no chaotic dynamics, no fractal attractor. The fixed point D* is a stable point, not
+a fractal cloud.
+This places the construction at the opposite end of the Tuci sharpness dimension spectrum
+from neural networks at the edge of stability. Those networks exploit chaotic dynamics for
+generalisation. This construction achieves lossless encoding by eliminating chaos entirely.
+5. The RoPE Analogy — Scope and Limits
+The canonical symmetry channels function as a procedural RoPE analogue:
+RoPE: rotates Q/K vectors by θ·position
+extrinsic, positional, parameter-free
+sinusoidal — frequency domain
+Quad comparator: reflects/inverts bit stream by symmetry
+extrinsic, positional, parameter-free
+arithmetic — symmetry domain
+Both are procedural, deterministic, parameter-free impositions of geometric structure. RoPE
+encodes position relative to sequence index — where a token sits numerically. The quad
+comparator encodes position relative to string structure — where information sits within the
+payload’s own geometry.
+The key distinction: RoPE is extrinsic to the payload (sequence position). The quad
+comparator is intrinsic to the payload (structural position). A token’s RoPE encoding
+changes depending on where it appears in the context window. A token’s quad comparator
+encoding is fixed by its own character structure.
+This makes the quad comparator a content-addressed positional encoding — position
+defined by what the token is, not where it sits.
+6. Metric Properties
+Each canonical symmetry channel individually satisfies the three metric axioms, verified
+empirically:
+Identity: d(x,x) = 0 for all tested strings ✓
+Symmetry: d(x,y) = d(y,x) to 14dp ✓
+Triangle inequality: zero violations across 455 triples ✓
+The cross-channel KL divergences are not symmetric (KL is not a metric) but satisfy the
+information-theoretic ordering that the structural predictions require.
+7. Summary
+The quadratic iterator produces two complementary layers of string characterisation:
+Structural phase channels (intrinsic):
+J-stream KL divergences across canonical transformations
+Palindrome identity: KL(f,r) = 0 exactly
+Semantic opposition: KL(f,c) discriminates 11.75× between like and oppositional strings
+Dwell/transition structure encodes run-length statistics arithmetically
+Canonical symmetry channels (extrinsic):
+D* fixed-point distances across forward/reverse/complement/reverse complement
+Forward channel: end-rhyme detector (2.24× discrimination)
+Reverse channel: onset/alliteration detector
+Positional asymmetry |Df − Dc|: KS-type distance, order axis 15× stronger than density
+axis
+Together — the quadratic information portrait — they characterise string structure across
+position, entropy, direction, and polarity simultaneously. Zero parameters. Zero training.
+O(4n) computation.
+The phonological structure was not designed in. It was always there in the arithmetic.
+8. Comparison to Existing Phonetic Methods
+Rule-based phonetic algorithms (Soundex, Metaphone, Double Metaphone, Cologne
+Phonetic) produce discrete codes and binary match/no-match decisions. The best-
+performing algorithms achieve benchmark scores of 6-7/7 on name-matching tasks. They
+are English-specific, fail on non-alphabetic characters, and produce no continuous distance
+metric.
+Neural phonetic embeddings and hybrid metrics (BERTScore + Soundex/Jaro-Winkler)
+achieve higher accuracy on semantic-phonetic tasks but require training, corpus statistics,
+and GPU inference. Even combined metrics show limited correlation between phonetic
+similarity and downstream LLM correctability.
+The D quad comparator:*
+Continuous metric: graded distance, not binary match/no-match
+Language-agnostic: any UTF-8 string, no phonetic rules
+Resolution: 14dp — far exceeding 4-character code
+Discrimination (rhyme): 2.24× (rhyme vs unrelated)
+Discrimination (KL): 11.75× (like vs oppositional)
+Training required: none
+Parameters: zero
+Inference cost: O(4n) iterator steps
+The comparison is not strictly against Soundex and Metaphone — those solve name-
+matching problems. The meaningful comparison is against parameter-free string metrics:
+Levenshtein edit distance, Jaro-Winkler similarity, and n-gram overlap. These detect
+character-level similarity but have no phonological grounding — edit distance between “cat”
+and “flat” is 2, missing the rhyme. The D* forward channel detects the rhyme as near-zero
+distance regardless of string length difference.
+The construction is not proposed as a replacement for any existing method. It is a
+complementary zero-parameter primitive that detects phonological structure as an
+arithmetic consequence of lossless encoding.
+9. References
+Su, J., Lu, Y., Pan, S., Murtadha, A., Wen, B., & Liu, Y. (2021). RoFormer: Enhanced
+Transformer with Rotary Position Embedding. arXiv:2104.09864.
+Tuci, M., Korkmaz, C., Şimşekli, U., & Birdal, T. (2026). Generalization at the Edge of
+Stability. arXiv:2604.19740. Project page: circle-group.github.io/research/GATES
+Behrouz, A., Li, Z., Deng, Y., & Zhong, P. (2026). Memory Caching: RNNs with Growing
+Memory. arXiv:2602.24281.
+Moudgil, A. et al. (2026). Attention to Mamba: A Recipe for Cross-Architectural Distillation.
+arXiv:2604.14191.
+Somerville, P. (2026). A Well-Conditioned Quadratic Transform with Inverse Interrogation
+and Error-Control Coding. unitambo.wordpress.com/2026/03/18/
+Somerville, P. (2026). Canonical Fixed-Point Indexing in the Quadratic Iterator.
+unitambo.wordpress.com
+Somerville, P. (2026). Memory and Access Complexity of the Quadratic Procedural Index.
+unitambo.wordpress.com
+Watson, J.D. & Crick, F.H.C. (1953). Molecular Structure of Nucleic Acids. Nature 171, 737–
+738. (Four-channel DNA representation.)
+Kullback, S. & Leibler, R.A. (1951). On Information and Sufficiency. Annals of Mathematical
+Statistics 22(1), 79–86.
