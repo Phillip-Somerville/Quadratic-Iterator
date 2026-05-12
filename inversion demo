@@ -1,0 +1,508 @@
+import { useState, useCallback } from “react”;
+
+// ── PARAMETERS ────────────────────────────────────────────────────
+const C_STATIC = 1.094;
+const DELTA    = 0.002;
+const PREC     = 14;
+
+// ── CORE TRUNCATION ───────────────────────────────────────────────
+function truncRound(x) {
+const r = Math.round(x * 1e14) / 1e14;
+const f = 1e14;
+return r >= 0 ? Math.floor(r * f) / f : Math.ceil(r * f) / f;
+}
+
+// ── ENCODE ────────────────────────────────────────────────────────
+// Guard digit fix: H_new passed raw to inversion probe.
+// trunc_round applied ONCE at step boundary, not at half-cycle.
+function encodeNode(payload, seed) {
+const bits = [];
+for (const ch of payload) {
+const code = ch.charCodeAt(0);
+for (let bit = 7; bit >= 0; bit–) bits.push((code >> bit) & 1);
+}
+bits.push(0, 0);
+const N     = bits.length;
+const F_seq = bits.map(b => C_STATIC + (b ? DELTA : 0));
+const H_hist = [seed];
+const B = [];
+let H = seed;
+for (let n = 0; n < N; n++) {
+const F       = F_seq[n];
+const u       = H * H - F;
+const H_new   = u * u - F;          // raw float64 — guard digit intact
+const inner   = H_new + F;          // probe on exact H_new
+let j = 0;
+if (inner >= 0) {
+const arg = F - Math.sqrt(inner);
+if (arg >= 0) {
+const k_int = Math.round(Math.sqrt(arg) * 1e14);
+const H_int = Math.round(H * 1e14);
+j = k_int - H_int;              // integer difference on 14dp grid
+}
+}
+B.push(j);
+H = truncRound(H_new);              // snap ONCE at step boundary
+H_hist.push(H);
+}
+return { H_terminal: H, B, N, F_seq, H_hist };
+}
+
+// ── INVERT FULL ───────────────────────────────────────────────────
+// H_next taken from H_hist (same raw value encode probe saw).
+// Integer correction: H_prev_int = k_int - B[n] — no float subtraction.
+function invertFull(enc) {
+const { N, B, F_seq, H_hist } = enc;
+const H_inv  = new Array(N + 1);
+const fwdErr = new Array(N).fill(0);
+H_inv[N] = enc.H_terminal;
+for (let n = N - 1; n >= 0; n–) {
+const F      = F_seq[n];
+const H_next = H_hist[n + 1];       // raw stored value — same as encode saw
+const inner  = H_next + F;
+if (inner < 0) return { ok: false, failStep: n };
+const arg = F - Math.sqrt(inner);
+if (arg  < 0) return { ok: false, failStep: n };
+const k_int      = Math.round(Math.sqrt(arg) * 1e14);
+const H_prev_int = k_int - B[n];    // integer correction
+H_inv[n]         = H_prev_int / 1e14;
+const u2 = H_inv[n] * H_inv[n] - F;
+fwdErr[n] = truncRound(u2 * u2 - F) - H_next;
+}
+return { ok: true, H0: H_inv[0], H_inv, fwdErr };
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+const fmt14 = x => (x >= 0 ? “+” : “”) + x.toFixed(14);
+const fmtE  = x => x.toExponential(2);
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// ── STYLES ────────────────────────────────────────────────────────
+const mono  = { fontFamily: “‘Courier New’, monospace” };
+const COLOR = {
+bg:      “#0a0e14”,
+panel:   “#0f1520”,
+border:  “#1e2d42”,
+dim:     “#2a3f5a”,
+accent:  “#00d4ff”,
+gold:    “#f0c040”,
+green:   “#3ddc84”,
+red:     “#ff5f5f”,
+muted:   “#4a6080”,
+text:    “#c8ddf0”,
+bright:  “#e8f4ff”,
+};
+
+const css = {
+root: {
+background: COLOR.bg,
+minHeight: “100vh”,
+color: COLOR.text,
+fontFamily: “‘Courier New’, monospace”,
+fontSize: 13,
+padding: “24px 16px”,
+},
+title: {
+color: COLOR.accent,
+fontSize: 11,
+letterSpacing: “0.25em”,
+textTransform: “uppercase”,
+marginBottom: 4,
+},
+heading: {
+color: COLOR.bright,
+fontSize: 20,
+fontWeight: “bold”,
+marginBottom: 20,
+borderBottom: `1px solid ${COLOR.dim}`,
+paddingBottom: 10,
+},
+section: {
+background: COLOR.panel,
+border: `1px solid ${COLOR.border}`,
+borderRadius: 6,
+padding: “14px 16px”,
+marginBottom: 14,
+},
+sectionTitle: {
+color: COLOR.gold,
+fontSize: 10,
+letterSpacing: “0.2em”,
+textTransform: “uppercase”,
+marginBottom: 10,
+},
+row: { display: “flex”, gap: 10, marginBottom: 10, flexWrap: “wrap” },
+label: { color: COLOR.muted, marginRight: 4 },
+val:   { color: COLOR.bright },
+input: {
+background: “#050a10”,
+border: `1px solid ${COLOR.dim}`,
+borderRadius: 4,
+color: COLOR.bright,
+fontFamily: “‘Courier New’, monospace”,
+fontSize: 13,
+padding: “5px 10px”,
+outline: “none”,
+flex: 1,
+minWidth: 0,
+},
+btn: {
+background: COLOR.accent,
+border: “none”,
+borderRadius: 4,
+color: “#000”,
+cursor: “pointer”,
+fontFamily: “‘Courier New’, monospace”,
+fontSize: 12,
+fontWeight: “bold”,
+letterSpacing: “0.1em”,
+padding: “6px 18px”,
+textTransform: “uppercase”,
+whiteSpace: “nowrap”,
+},
+table: {
+width: “100%”,
+borderCollapse: “collapse”,
+fontSize: 12,
+overflowX: “auto”,
+display: “block”,
+},
+th: {
+color: COLOR.muted,
+borderBottom: `1px solid ${COLOR.dim}`,
+padding: “3px 10px 6px 0”,
+textAlign: “left”,
+fontSize: 10,
+letterSpacing: “0.15em”,
+textTransform: “uppercase”,
+whiteSpace: “nowrap”,
+},
+td: {
+padding: “2px 10px 2px 0”,
+borderBottom: `1px solid #131e2e`,
+whiteSpace: “nowrap”,
+},
+badge: (ok) => ({
+background: ok ? “#0d2a1a” : “#2a0d0d”,
+border: `1px solid ${ok ? COLOR.green : COLOR.red}`,
+borderRadius: 3,
+color: ok ? COLOR.green : COLOR.red,
+fontSize: 10,
+padding: “1px 5px”,
+display: “inline-block”,
+}),
+stat: {
+display: “inline-block”,
+background: “#050a10”,
+border: `1px solid ${COLOR.dim}`,
+borderRadius: 4,
+padding: “6px 12px”,
+marginRight: 8,
+marginBottom: 6,
+},
+};
+
+// ── COMPONENT ─────────────────────────────────────────────────────
+export default function InversionDemo() {
+const [payload, setPayload] = useState(“Alice”);
+const [seedStr, setSeedStr] = useState(“0.087”);
+const [result,  setResult]  = useState(null);
+const [error,   setError]   = useState(null);
+const [showAll, setShowAll] = useState(false);
+
+const run = useCallback(() => {
+setError(null);
+const seed = parseFloat(seedStr);
+if (isNaN(seed)) { setError(“Invalid seed”); return; }
+const enc = encodeNode(payload, seed);
+const inv = invertFull(enc);
+setResult({ enc, inv, seed, payload });
+setShowAll(false);
+}, [payload, seedStr]);
+
+const reset = useCallback(() => {
+setPayload(“Alice”);
+setSeedStr(“0.087”);
+setResult(null);
+setError(null);
+setShowAll(false);
+}, []);
+
+const R = result;
+
+return (
+<div style={css.root}>
+<div style={css.title}>Bijective Quadratic Iterator</div>
+<div style={css.heading}>Inversion Demonstrator</div>
+
+```
+  {/* ── INPUT ── */}
+  <div style={css.section}>
+    <div style={css.sectionTitle}>Input</div>
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ ...css.label, marginBottom: 4, display: "block" }}>Payload</div>
+      <input
+        style={{ ...css.input, width: "100%", boxSizing: "border-box" }}
+        value={payload}
+        onChange={e => setPayload(e.target.value)}
+        placeholder="any UTF-8 string"
+      />
+    </div>
+    <div style={css.row}>
+      <div style={{ flex: 1, minWidth: 90 }}>
+        <div style={{ ...css.label, marginBottom: 4, display: "block" }}>Seed</div>
+        <input
+          style={css.input}
+          value={seedStr}
+          onChange={e => setSeedStr(e.target.value)}
+          placeholder="0.087"
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+        <button style={css.btn} onClick={run}>Run</button>
+        <button
+          style={{ ...css.btn, background: "transparent", border: `1px solid ${COLOR.dim}`, color: COLOR.muted }}
+          onClick={reset}
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+    {error && <div style={{ color: COLOR.red, marginTop: 6 }}>{error}</div>}
+  </div>
+
+  {R && (() => {
+    const { enc, inv, seed } = R;
+    const nz    = enc.B.filter(j => j !== 0).length;
+    const seedErr = inv.ok ? inv.H0 - seed : null;
+    const exact   = inv.ok && Math.abs(seedErr) < 1e-13;
+    const maxE  = inv.ok ? Math.max(...inv.fwdErr.map(Math.abs)) : null;
+    const rmsE  = inv.ok
+      ? Math.sqrt(inv.fwdErr.reduce((s,x) => s + x*x, 0) / enc.N)
+      : null;
+    const nzE   = inv.ok ? inv.fwdErr.filter(x => Math.abs(x) > 1e-16).length : 0;
+    const rows  = showAll ? enc.N : Math.min(enc.N, 12);
+
+    return <>
+      {/* ── FORWARD SUMMARY ── */}
+      <div style={css.section}>
+        <div style={css.sectionTitle}>Forward Pass</div>
+        <div style={css.row}>
+          <div style={css.stat}>
+            <span style={css.label}>N steps </span>
+            <span style={css.val}>{enc.N}</span>
+            <span style={{ ...css.label, marginLeft: 6 }}>
+              (8×{R.payload.length} chars + 2)
+            </span>
+          </div>
+          <div style={css.stat}>
+            <span style={css.label}>Terminal digest </span>
+            <span style={{ ...css.val, color: COLOR.accent }}>{fmt14(enc.H_terminal)}</span>
+          </div>
+          <div style={css.stat}>
+            <span style={css.label}>B[] non-zero </span>
+            <span style={css.val}>{nz}</span>
+            <span style={css.label}> / {enc.N}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── INVERSION SUMMARY ── */}
+      <div style={css.section}>
+        <div style={css.sectionTitle}>Inversion Result</div>
+        {inv.ok ? (
+          <>
+            <div style={css.row}>
+              <div style={css.stat}>
+                <span style={css.label}>Recovered seed </span>
+                <span style={{ ...css.val, color: COLOR.green }}>{fmt14(inv.H0)}</span>
+              </div>
+              <div style={css.stat}>
+                <span style={css.label}>True seed </span>
+                <span style={css.val}>{fmt14(seed)}</span>
+              </div>
+              <div style={css.stat}>
+                <span style={css.label}>Recovery error </span>
+                <span style={{ color: exact ? COLOR.green : COLOR.red }}>
+                  {fmtE(seedErr)}
+                </span>
+                <span style={{ marginLeft: 8 }}>
+                  <span style={css.badge(exact)}>{exact ? "EXACT" : "MISMATCH"}</span>
+                </span>
+              </div>
+            </div>
+            <div style={css.row}>
+              <div style={css.stat}>
+                <span style={css.label}>Max |fwd_err| </span>
+                <span style={css.val}>{fmtE(maxE)}</span>
+              </div>
+              <div style={css.stat}>
+                <span style={css.label}>RMS fwd_err </span>
+                <span style={css.val}>{fmtE(rmsE)}</span>
+              </div>
+              <div style={css.stat}>
+                <span style={css.label}>Non-zero residuals </span>
+                <span style={{ color: nzE === 0 ? COLOR.green : COLOR.gold }}>
+                  {nzE} / {enc.N}
+                </span>
+              </div>
+            </div>
+            {nzE === 0 && (
+              <div style={{ color: COLOR.green, marginTop: 4 }}>
+                ✓ All residuals zero — inversion algebraically exact
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ color: COLOR.red }}>
+            ✗ Inversion failed at step {inv.failStep} — inner &lt; 0 or arg &lt; 0
+          </div>
+        )}
+      </div>
+
+      {/* ── STEP TABLE ── */}
+      <div style={css.section}>
+        <div style={css.sectionTitle}>
+          Per-Step Reconstruction
+          {enc.N > 12 && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              style={{
+                ...css.btn,
+                marginLeft: 12,
+                fontSize: 10,
+                padding: "2px 10px",
+                background: "transparent",
+                border: `1px solid ${COLOR.dim}`,
+                color: COLOR.muted,
+              }}
+            >
+              {showAll ? `Show first 12` : `Show all ${enc.N}`}
+            </button>
+          )}
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={css.table}>
+            <thead>
+              <tr>
+                {["n","F_n","H_n (true)","H_n (inverted)","delta","B[n]","fwd_err"].map(h => (
+                  <th key={h} style={css.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: rows + 1 }, (_, i) => {
+                const trueH = enc.H_hist[i];
+                const recH  = inv.ok ? inv.H_inv[i] : null;
+                const delta = recH !== null ? recH - trueH : null;
+                const ok    = delta !== null && Math.abs(delta) < 1e-12;
+                const fe    = inv.ok && i < enc.N ? inv.fwdErr[i] : null;
+                const Bval  = i < enc.N ? enc.B[i] : null;
+                const Bnz   = Bval !== null && Bval !== 0;
+                return (
+                  <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "#080d14" }}>
+                    <td style={{ ...css.td, color: COLOR.muted }}>{i}</td>
+                    <td style={css.td}>{i < enc.N ? enc.F_seq[i].toFixed(3) : "—"}</td>
+                    <td style={{ ...css.td, color: COLOR.text }}>{fmt14(trueH)}</td>
+                    <td style={{ ...css.td, color: recH !== null ? COLOR.green : COLOR.muted }}>
+                      {recH !== null ? fmt14(recH) : "—"}
+                    </td>
+                    <td style={{ ...css.td, color: ok ? COLOR.green : COLOR.red }}>
+                      {delta !== null ? fmtE(delta) : "—"}
+                      {delta !== null && <span style={{ marginLeft: 4 }}>{ok ? "✓" : "✗"}</span>}
+                    </td>
+                    <td style={{ ...css.td, color: Bnz ? COLOR.gold : COLOR.muted }}>
+                      {Bval !== null ? (Bval >= 0 ? "+" : "") + Bval : "—"}
+                      {Bnz && <span style={{ color: COLOR.dim, marginLeft: 4 }}>←</span>}
+                    </td>
+                    <td style={{ ...css.td, color: fe && Math.abs(fe) > 1e-16 ? COLOR.gold : COLOR.muted }}>
+                      {fe !== null ? fmtE(fe) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!showAll && enc.N > 12 && (
+                <tr>
+                  <td colSpan={7} style={{ ...css.td, color: COLOR.muted, textAlign: "center", padding: "6px 0" }}>
+                    … {enc.N - 12} steps hidden —
+                    <span
+                      onClick={() => setShowAll(true)}
+                      style={{ color: COLOR.accent, cursor: "pointer", marginLeft: 4 }}
+                    >
+                      show all
+                    </span>
+                  </td>
+                </tr>
+              )}
+              {/* terminal row */}
+              <tr style={{ borderTop: `1px solid ${COLOR.dim}` }}>
+                <td style={{ ...css.td, color: COLOR.muted }}>—</td>
+                <td style={{ ...css.td, color: COLOR.muted }}>—</td>
+                <td style={{ ...css.td, color: COLOR.accent }}>{fmt14(enc.H_terminal)}</td>
+                <td style={{ ...css.td, color: COLOR.muted }}>terminal</td>
+                <td colSpan={3} style={{ ...css.td, color: COLOR.muted }}></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── ALGEBRAIC WORKING ── */}
+      <div style={css.section}>
+        <div style={css.sectionTitle}>Algebraic Working</div>
+        <div style={{ color: COLOR.muted, lineHeight: 1.9 }}>
+          <div style={{ marginBottom: 10 }}>
+            <span style={{ color: COLOR.gold }}>Forward map</span>
+            <span style={{ color: COLOR.dim }}> (one step):</span>
+          </div>
+          <div style={{ marginLeft: 16, marginBottom: 14, color: COLOR.text }}>
+            H<sub>n+1</sub> = TRUNC( ROUND( (H<sub>n</sub>² − F<sub>n</sub>)² − F<sub>n</sub> , 14 ) )
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <span style={{ color: COLOR.gold }}>Inverse map</span>
+            <span style={{ color: COLOR.dim }}> (given H<sub>n+1</sub>, F<sub>n</sub>, B[n]):</span>
+          </div>
+          <div style={{ marginLeft: 16, marginBottom: 14 }}>
+            {[
+              ["1.", "inner", "= H_{n+1} + F_n", "≥ 0 guaranteed in basin"],
+              ["2.", "u",     "= √inner",         "positive branch"],
+              ["3.", "arg",   "= F_n − u",        ""],
+              ["4.", "k",     "= ROUND(√arg, 14)","principal square root"],
+              ["5.", "H_n",   "= k − B[n]×10⁻¹⁴","branch correction"],
+            ].map(([num, lhs, rhs, note]) => (
+              <div key={num} style={{ marginBottom: 4 }}>
+                <span style={{ color: COLOR.muted, marginRight: 8 }}>{num}</span>
+                <span style={{ color: COLOR.accent, marginRight: 6 }}>{lhs}</span>
+                <span style={{ color: COLOR.text,   marginRight: 10 }}>{rhs}</span>
+                {note && <span style={{ color: COLOR.dim }}>← {note}</span>}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ color: COLOR.gold }}>B[] dual role:</span>
+          </div>
+          <div style={{ marginLeft: 16 }}>
+            <div style={{ marginBottom: 4 }}>
+              <span style={{ color: COLOR.accent }}>(a) TARGET STREAM</span>
+              <span style={{ color: COLOR.muted }}> — disambiguates the four quartic root branches</span>
+            </div>
+            <div>
+              <span style={{ color: COLOR.accent }}>(b) ERROR STREAM</span>
+              <span style={{ color: COLOR.muted }}> — carries FP residual at ε = 10⁻¹⁴ per step</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>;
+  })()}
+
+  {!R && (
+    <div style={{ ...css.section, color: COLOR.muted, textAlign: "center", padding: 32 }}>
+      Enter a payload and seed, then press Run
+    </div>
+  )}
+</div>
+```
+
+);
+}
