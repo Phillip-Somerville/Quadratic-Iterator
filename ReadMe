@@ -46,23 +46,101 @@ J[n]   = sgn(k − H[n−2])
 
 The interrogation fires at `n`, but describes the relationship between levels `n−2` and `n−1`. The **embedding depth** is therefore two steps behind the current position: the event at level `n−1` is embedded into the stream at position `n`.
 
+### Stored J-Stream — Column A
+
+The stored J-stream record holds the **absolute value** `|J[n]|` — always 0 or 1. The sign information (columns B and C) is recovered at inversion time from the digest’s quad channel band position (see below). This separation means the stored stream carries no redundant information.
+
 ### Floating-Point Guarantee
 
-IEEE 754 mandates that `sqrt` is **correctly rounded** — the result is the closest representable float64 to the true mathematical value, within ±0.5 ULP. Because `k = trunc_round(sqrt(val2))` inverts the same squaring operation that produced `H[n−1]` from `H[n−2]`, and both the forward and inverse paths apply `trunc_round` at the same precision, the residual `k − H[n−2]` is bounded within ±1 ULP at 14 decimal places.
-
-This is not an approximation or a threshold classification — it is a consequence of IEEE 754 correct rounding. The J-stream is **provably ternary** without any epsilon guard.
+IEEE 754 mandates that `sqrt` is **correctly rounded** — the result is the closest representable float64 to the true mathematical value, within ±0.5 ULP. Because `k = trunc_round(sqrt(val2))` inverts the same squaring operation that produced `H[n−1]` from `H[n−2]`, and both the forward and inverse paths apply `trunc_round` at the same precision, the residual `k − H[n−2]` is bounded within ±1 ULP at 14 decimal places. The J-stream is **provably ternary** without any epsilon guard.
 
 ### Zero Events
 
-`J[n] = 0` fires when `k == H[n−2]` exactly in float64 — i.e. when the inverse interrogation closes back to the prior state with no residual. This is a genuine fixed-point condition at the precision boundary, not a numerical accident. Zero rate is payload-dependent (typically 35–48%) and invariant to seed.
+`J[n] = 0` fires when `k == H[n−2]` exactly in float64 — a genuine fixed-point condition at the precision boundary. Zero rate is payload-dependent (typically 35–48%) and invariant to seed.
 
 -----
 
 ## Hanging Value Convention
 
-The forward H-trace is built as a complete array `H[0..N]` before J-stream computation begins. This is intentional: the J computation at position `n` requires simultaneous access to `H[n−2]`, `H[n−1]`, and `F[n−1]`. Attempting to compute J inline during forward iteration requires carrying a two-step history buffer (`H_prev2`, `H_prev1`), which is equivalent but more error-prone.
+The forward H-trace is built as a complete array `H[0..N]` before J-stream computation begins. The **hanging value** is `H[0] = seed` — it participates as `H[n−2]` in the first two J computations but is never itself the output of an iterator step. It is the nonce: seed-dependent, not payload-dependent.
 
-The **hanging value** is `H[0] = seed` — it participates as `H[n−2]` in the first two J computations but is never itself the output of an iterator step. It is the nonce: seed-dependent, not payload-dependent. All downstream properties (D*, rhyme detection, palindrome identity) are seed-independent by convergence of the fixed-point loop.
+On inversion, the hanging J value at position 0 is **sacrificed** to bootstrap the first backward step — it provides the transition control needed to step from the digest to level n−1, after which the B,C band coding takes over for the remainder of the backward chain.
+
+All downstream properties (D*, rhyme detection, palindrome identity) are seed-independent by convergence of the fixed-point loop.
+
+-----
+
+## Quad Channel Band Structure
+
+The attractor basin divides into **eight discrete bands** determined by the terminal two-bit pattern of the payload bit-sequence (the two bits immediately preceding the closing zeros). The bands are non-overlapping and separated by gaps of ≥ 4.9×10⁻⁵.
+
+### Band Map
+
+|Band|Terminal bits|Transition type|Channel half|B|C|
+|----|-------------|---------------|------------|-|-|
+|1   |`(1, 0)`     |alternation → 0|Lower (F/R) |0|0|
+|2   |`(0, 0)`     |consecutive 0s |Lower (F/R) |0|0|
+|3   |`(1, 1)`     |consecutive 1s |Lower (F/R) |0|1|
+|4   |`(0, 1)`     |alternation → 1|Lower (F/R) |0|1|
+|5   |`(1, 0)`     |alternation → 0|Upper (C/RC)|1|0|
+|6   |`(0, 0)`     |consecutive 0s |Upper (C/RC)|1|0|
+|7   |`(1, 1)`     |consecutive 1s |Upper (C/RC)|1|1|
+|8   |`(0, 1)`     |alternation → 1|Upper (C/RC)|1|1|
+
+L, M channels code `0` for B, C respectively. O, P channels code `1` for B, C respectively. L and P represent shift events from opposite binary. M and N represent attractor descent of consecutive same binary. There are no consecutive M/N transitions.
+
+### Hardcoded Boundaries
+
+Boundaries are hardcoded with 10% gap buffer (≈ 4.9×10⁻⁶) to prevent out-of-range errors:
+
+```python
+BAND_BOUNDARIES = [
+    (0.08636316488056, 0.08645049942242),  # band 1: lower, terminal (1,0)
+    (0.08648981066002, 0.08657545468422),  # band 2: lower, terminal (0,0)
+    (0.08669545053069, 0.08678420037717),  # band 3: lower, terminal (1,1)
+    (0.08682443149389, 0.08691142795026),  # band 4: lower, terminal (0,1)
+    (0.08781118962651, 0.08790084886874),  # band 5: upper, terminal (1,0)
+    (0.08794169894719, 0.08802964069811),  # band 6: upper, terminal (0,0)
+    (0.08815360499332, 0.08824478706384),  # band 7: upper, terminal (1,1)
+    (0.08828655569850, 0.08837595523818),  # band 8: upper, terminal (0,1)
+]
+```
+
+### B, C Recovery
+
+Given a digest value, B and C are recovered without any stored overhead:
+
+```python
+def digest_band(digest):
+    for i, (lo, hi) in enumerate(BAND_BOUNDARIES):
+        if lo <= digest <= hi:
+            return i + 1
+    return 0  # in gap — should not occur for valid digests
+
+def band_bc(band):
+    if band == 0:
+        return None, None
+    B = 0 if band <= 4 else 1
+    C = 0 if (band - 1) % 4 < 2 else 1
+    return B, C
+```
+
+-----
+
+## Inversion Convention
+
+On inversion the stored record is:
+
+- **Column A**: `|J[n]|` — absolute ternary stream (0 or 1)
+- **Digest**: terminal float value H[N]
+
+The backward chain proceeds as follows:
+
+1. The digest’s band position gives B, C for the current level — encoding the transition that produced it from two steps back (n−2).
+1. The hanging column A value at position 0 is sacrificed to provide the transition adjustment for the initial n−1 step.
+1. Each subsequent J value from column A, combined with the band B,C coding of the current digest, controls the next backward step.
+
+The look-ahead convention is held throughout: a digest value is reflective of its transition from the value n−2 iterations ago. The J event cast at n describes the n−2 level, embedded at n+1. Inversion reads this offset in reverse.
 
 -----
 
@@ -97,7 +175,7 @@ Four canonical fingerprints per payload:
 |`comp`   |bitwise complement of forward|
 |`revcomp`|bitwise complement of reverse|
 
-**Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes.  
+**Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes — both channels collapse to the same band.  
 **Rhyme detection:** `d_star(p1, p2) < 1e−10` for phonetically rhyming pairs.
 
 -----
