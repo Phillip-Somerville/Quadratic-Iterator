@@ -1,0 +1,162 @@
+# Bijective Quadratic Iterator
+
+**f(x) = (x² − F)² − F**
+
+A bijective iterator construct producing content-addressed digests and ternary J-stream control sequences from arbitrary UTF-8 payloads.
+
+-----
+
+## Core Construction
+
+The iterator applies the map
+
+```
+H[n+1] = TRUNC(ROUND((H[n]² − F[n])² − F[n], 14), 14)
+```
+
+over a bit-expanded payload, where `F[n] ∈ {1.094, 1.096}` is determined by the nth payload bit. Two closing zero-bits are appended to every payload, giving `N = 8·len(payload) + 2` steps. The terminal value `H[N]` is the **digest**.
+
+### Precision Discipline
+
+All intermediate arithmetic operates at full IEEE 754 float64 precision. The `TRUNC(ROUND(·, 14), 14)` operation — hereafter `trunc_round` — is applied only at the output of each forward step, and symmetrically at the output of each inverse interrogation. No intermediate truncation occurs.
+
+```python
+def trunc_round(x, dp=14):
+    r = round(x, dp)
+    f = 10**dp
+    return math.floor(r * f) / f if r >= 0 else math.ceil(r * f) / f
+```
+
+-----
+
+## J-Stream
+
+The J-stream is a ternary sequence `{−1, 0, +1}` generated **during** forward iteration. It is not a post-hoc annotation — each symbol is produced as a byproduct of the step that embeds it.
+
+### Inverse Interrogation Depth
+
+At forward step `n`, the iterator interrogates **level n−1**: it inverts `H[n−1]` using `F[n−1]` via the principal branch of the inverse map, and compares the result to `H[n−2]`.
+
+```
+inner  = H[n−1] + F[n−1]                         # full float64
+val2   = F[n−1] − sqrt(inner)                     # full float64
+k      = trunc_round(sqrt(val2))                  # disciplined — matches forward
+J[n]   = sgn(k − H[n−2])
+```
+
+The interrogation fires at `n`, but describes the relationship between levels `n−2` and `n−1`. The **embedding depth** is therefore two steps behind the current position: the event at level `n−1` is embedded into the stream at position `n`.
+
+### Floating-Point Guarantee
+
+IEEE 754 mandates that `sqrt` is **correctly rounded** — the result is the closest representable float64 to the true mathematical value, within ±0.5 ULP. Because `k = trunc_round(sqrt(val2))` inverts the same squaring operation that produced `H[n−1]` from `H[n−2]`, and both the forward and inverse paths apply `trunc_round` at the same precision, the residual `k − H[n−2]` is bounded within ±1 ULP at 14 decimal places.
+
+This is not an approximation or a threshold classification — it is a consequence of IEEE 754 correct rounding. The J-stream is **provably ternary** without any epsilon guard.
+
+### Zero Events
+
+`J[n] = 0` fires when `k == H[n−2]` exactly in float64 — i.e. when the inverse interrogation closes back to the prior state with no residual. This is a genuine fixed-point condition at the precision boundary, not a numerical accident. Zero rate is payload-dependent (typically 35–48%) and invariant to seed.
+
+-----
+
+## Hanging Value Convention
+
+The forward H-trace is built as a complete array `H[0..N]` before J-stream computation begins. This is intentional: the J computation at position `n` requires simultaneous access to `H[n−2]`, `H[n−1]`, and `F[n−1]`. Attempting to compute J inline during forward iteration requires carrying a two-step history buffer (`H_prev2`, `H_prev1`), which is equivalent but more error-prone.
+
+The **hanging value** is `H[0] = seed` — it participates as `H[n−2]` in the first two J computations but is never itself the output of an iterator step. It is the nonce: seed-dependent, not payload-dependent. All downstream properties (D*, rhyme detection, palindrome identity) are seed-independent by convergence of the fixed-point loop.
+
+-----
+
+## Fixed Point D*
+
+For any payload, there exists a unique `D*` satisfying:
+
+```
+encode_node(payload, D*)[0] == D*
+```
+
+`D*` is found by iterating the digest map from any seed; convergence is guaranteed in ≤ 2 loops. `D*` is seed-independent and serves as the canonical payload fingerprint.
+
+**D* distance** between two payloads:
+
+```python
+d_star(p1, p2) = |fixed_point(p1) − fixed_point(p2)|
+```
+
+This satisfies identity, symmetry, and triangle inequality.
+
+-----
+
+## Quad Channel
+
+Four canonical fingerprints per payload:
+
+|Channel  |Bit stream                   |
+|---------|-----------------------------|
+|`forward`|payload bits                 |
+|`reverse`|reversed payload bits        |
+|`comp`   |bitwise complement of forward|
+|`revcomp`|bitwise complement of reverse|
+
+**Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes.  
+**Rhyme detection:** `d_star(p1, p2) < 1e−10` for phonetically rhyming pairs.
+
+-----
+
+## Parameters
+
+|Symbol    |Value|Meaning                                     |
+|----------|-----|--------------------------------------------|
+|`C_STATIC`|1.094|F value for bit 0                           |
+|`DELTA`   |0.002|F increment for bit 1 → F = 1.096           |
+|`PREC`    |14   |Decimal places for `trunc_round`            |
+|`seed`    |0.087|Default nonce (any value in attractor basin)|
+
+-----
+
+## Self-Test
+
+```
+python iterator_canonical.py
+```
+
+Expected output:
+
+```
+Canonical iterator — self-test
+
+Payload : 'the rain in Spain falls mainly on the plain'
+D*      : 0.08641728517128
+Closes  : True ✓
+
+J-stream N=346  -1:102  0:132  +1:112
+Ternary  : PASS ✓
+
+Rhyme detection:
+  rain/Spain: 0.000000e+00 ← rhyme
+  rain/plain: 0.000000e+00 ← rhyme
+  cat/rat: 6.018000e-11 ← rhyme
+  cat/dog: 2.015007e-04
+
+Palindrome |D*_forward − D*_reverse|:
+  racecar: 0.000000e+00 ✓
+  level: 0.000000e+00 ✓
+  madam: 0.000000e+00 ✓
+```
+
+-----
+
+## Musical Encoding Convention
+
+Notes encoded as concatenated name strings, no separators.
+
+|Type    |Notation              |
+|--------|----------------------|
+|Naturals|`C D E F G A B`       |
+|Flats   |`Cb Db Eb Fb Gb Ab Bb`|
+|Sharps  |`Cs Ds Es Fs Gs As Bs`|
+
+Example — D-flat major opening of *Clair de Lune*: `"AbAbAbFEbDb"`
+
+-----
+
+*Phillip Somerville (@unitambo)*
