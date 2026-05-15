@@ -1,134 +1,123 @@
-# CANONICAL QUADRATIC ITERATOR IMPLEMENTATION
+# CANONICAL QUADRATIC ITERATOR
 
 # Phillip Somerville (@unitambo)
 
-# f(x) = (x² − F)² − F
+# 
 
-# J-stream: sgn(k − H[n−2]) via inverse interrogation at level n−1
+# f(x) = (x^2 - F)^2 - F
 
-# IEEE 754 correctly-rounded sqrt guarantees closure within ±1 ULP
+# J[n] = sgn(k - H[n-2])  via inverse interrogation at level n-1
+
+# IEEE 754 correctly-rounded sqrt guarantees ternary closure within +/-1 ULP
+
+# 
+
+# See README for full architectural description.
 
 import math
-from collections import defaultdict
 
 # ── PARAMETERS ────────────────────────────────────────────────────────
 
-C_STATIC = 1.094          # static F value (bit=0)
-DELTA    = 0.002          # delta        (bit=1 → F=1.096)
-PREC     = 14             # decimal precision
+C_STATIC = 1.094   # F value for bit 0
+DELTA    = 0.002   # F increment for bit 1  ->  F = 1.096
+PREC     = 14      # decimal places for trunc_round
 
-# ── CORE TRUNCATION ───────────────────────────────────────────────────
+# ── PRECISION ─────────────────────────────────────────────────────────
 
 def trunc_round(x, dp=PREC):
-“”“TRUNC(ROUND(x, 14), 14) — canonical precision discipline.”””
+“”“TRUNC(ROUND(x, 14), 14) — defines the discrete orbit space.”””
 r = round(x, dp)
-f = 10**dp
+f = 10 ** dp
 return math.floor(r * f) / f if r >= 0 else math.ceil(r * f) / f
 
-# ── SINGLE PASS ───────────────────────────────────────────────────────
+# ── BIT EXPANSION ─────────────────────────────────────────────────────
+
+def payload_bits(text):
+“”“UTF-8 codepoints -> bit sequence, big-endian, + two closing zero-bits.”””
+bits = []
+for ch in text:
+code     = ord(ch)
+byte_len = max(1, math.ceil(math.log2(code + 1) / 8))
+for b in range(byte_len - 1, -1, -1):
+byte = (code >> (b * 8)) & 0xff
+for i in range(7, -1, -1):
+bits.append((byte >> i) & 1)
+return bits + [0, 0]
+
+# ── CORE ENCODE ───────────────────────────────────────────────────────
 
 def encode_node(payload, seed=0.087):
 “””
-Single pass of iterator over payload from seed.
-Returns (digest, J, N).
+Single forward pass over payload from seed.
 
 ```
-J-stream semantics:
-  At step n, interrogate level n-1:
-    k    = trunc_round(sqrt(F[n-1] - sqrt(H[n-1] + F[n-1])))
-    J[n] = sgn(k - H[n-2])
-  Intermediates (inner, val2) computed at full float64 precision.
-  trunc_round applied only at final k — symmetric with forward step.
-  Zero fires on exact IEEE 754 closure; ±1 on single-ULP residual sign.
+At each step n the iterator interrogates level n-1:
+    inner = H[n-1] + F[n-1]                     full float64
+    val2  = F[n-1] - sqrt(inner)                 full float64
+    k     = trunc_round(sqrt(val2))              symmetric with forward
+    J[n]  = sgn(k - H[n-2])
 
-payload : str   — any UTF-8
-seed    : float — starting H value (nonce)
+trunc_round is applied only at the output of each forward step
+and at the final k — never at intermediate values.
 
-Returns:
-  digest : float — terminal H value
-  J      : list  — ternary control stream {-1, 0, +1}
-  N      : int   — length of J (= 8*len(payload) + 2)
+Returns: (digest, J, N)
+    digest  terminal H value  H[N]
+    J       ternary stream    {-1, 0, +1},  length N
+    N       steps             8 * codepoint_bytes(payload) + 2
 """
-bits  = [int(x) for ch in payload for x in format(ord(ch), '08b')]
-b_seq = bits + [0, 0]
-N     = len(b_seq)
-FSeq  = [C_STATIC + (DELTA if b == 1 else 0) for b in b_seq]
+bits = payload_bits(payload)
+N    = len(bits)
+FSeq = [C_STATIC + (DELTA if b else 0) for b in bits]
 
-# build full H trace
-H = [0.0] * (N + 1)
+H    = [0.0] * (N + 1)
 H[0] = seed
 for n in range(N):
     F      = FSeq[n]
-    H[n+1] = trunc_round((H[n]*H[n] - F)**2 - F)
+    H[n+1] = trunc_round((H[n] * H[n] - F) ** 2 - F)
 
-# J-stream: n-1 inverse interrogation compared to n-2
 J = []
 for n in range(1, N + 1):
-    F_prev = FSeq[n-1]
-    H_nm1  = H[n]      # output of step n-1 — value being inverted
-    H_nm2  = H[n-1]    # H[n-2]             — comparison target
+    Fp   = FSeq[n - 1]
+    Hn1  = H[n]       # value being inverted  (level n-1 output)
+    Hn2  = H[n - 1]   # comparison target     (H[n-2])
 
-    inner = H_nm1 + F_prev                      # full float64
+    inner = Hn1 + Fp
     if inner >= 0:
-        val2 = F_prev - math.sqrt(inner)        # full float64
+        val2 = Fp - math.sqrt(inner)
         if val2 >= 0:
-            k    = trunc_round(math.sqrt(val2)) # matches forward discipline
-            diff = k - H_nm2
+            k    = trunc_round(math.sqrt(val2))
+            diff = k - Hn2
             j    = 0 if diff == 0.0 else (1 if diff > 0 else -1)
         else:
-            j = 1 if H_nm1 >= H_nm2 else -1
+            j = 1 if Hn1 >= Hn2 else -1
     else:
-        j = 1 if H_nm1 >= H_nm2 else -1
+        j = 1 if Hn1 >= Hn2 else -1
     J.append(j)
 
 return H[N], J, N
 ```
 
-# ── FIXED POINT (D*) ──────────────────────────────────────────────────
+# ── D* FIXED POINT ────────────────────────────────────────────────────
 
-def fixed_point(payload, seed=0.087, max_loops=20):
+def fixed_point(payload, seed=0.087):
 “””
-Find canonical fixed point D* for payload.
-Seed-independent — converges in ≤ 2 loops.
-D* satisfies: encode_node(payload, D*)[0] == D*
+Canonical seed-independent digest D*.
+Satisfies: encode_node(payload, D*)[0] == D*
+Convergence guaranteed in <= 2 loops.
 “””
 D = seed
-for _ in range(max_loops):
+for _ in range(20):
 D_new, _, _ = encode_node(payload, D)
-if abs(D_new - D) < 1e-14:
+if abs(D_new - D) < 1e-15:
 return D_new
 D = D_new
 return D
 
-# ── BUILD CHAINED INDEX ───────────────────────────────────────────────
+# ── D* DISTANCE ───────────────────────────────────────────────────────
 
-def build_index(lines):
+def d_star_distance(p1, p2):
 “””
-Build chained digest index from list of (id, payload) pairs.
-Each digest feeds as seed to the next node.
-Returns dict: {node_id: {payload, digest, depth, seed, J, overhead}}
-“””
-idx  = {}
-seed = 0.087
-for node_id, payload in lines:
-digest, J, N = encode_node(payload, seed)
-nonzero = sum(1 for j in J if j != 0)
-idx[node_id] = {
-‘payload’:  payload,
-‘digest’:   digest,
-‘depth’:    N,
-‘seed’:     seed,
-‘J’:        J,
-‘overhead’: nonzero / N,
-}
-seed = digest
-return idx
-
-# ── D* DISTANCE METRIC ────────────────────────────────────────────────
-
-def d_star(p1, p2):
-“””
-D* distance between two payloads.
+Metric distance between two payloads.
 Satisfies identity, symmetry, triangle inequality.
 “””
 return abs(fixed_point(p1) - fixed_point(p2))
@@ -137,78 +126,83 @@ return abs(fixed_point(p1) - fixed_point(p2))
 
 def quad_channel(text):
 “””
-Four canonical channel fingerprint.
-forward, reverse, complement, reverse-complement.
-“””
-def get_bits(t):
-bits = [int(x) for ch in t for x in format(ord(ch), ‘08b’)]
-return bits + [0, 0]
+Four canonical D* fingerprints per payload.
 
 ```
-bits_f  = get_bits(text)
-bits_r  = get_bits(text[::-1])
-bits_c  = [1 - b for b in bits_f]
-bits_rc = [1 - b for b in bits_r]
+forward   payload bits as-is
+reverse   reversed payload bits
+comp      bitwise complement of forward
+revcomp   bitwise complement of reverse
 
-def run(bits):
-    FSeq = [C_STATIC + (DELTA if b == 1 else 0) for b in bits]
+Palindrome identity:  |forward - reverse| = 0 exactly for palindromes.
+Rhyme detection:      d_star_distance(p1, p2) < 1e-10 for rhyming pairs.
+"""
+def fp_from_bits(bits):
+    # run fixed-point loop directly on pre-built bit sequence
+    # (bits already includes closing zeros from payload_bits)
+    FSeq = [C_STATIC + (DELTA if b else 0) for b in bits]
     D = 0.087
     for _ in range(20):
         H = D
         for F in FSeq:
-            H = trunc_round((H*H - F)**2 - F)
-        if abs(H - D) < 1e-14:
+            H = trunc_round((H * H - F) ** 2 - F)
+        if abs(H - D) < 1e-15:
             return H
         D = H
     return H
 
+bits_f  = payload_bits(text)
+bits_r  = payload_bits(text[::-1])
+bits_c  = [1 - b for b in bits_f]
+bits_rc = [1 - b for b in bits_r]
+
 return {
-    'forward': run(bits_f),
-    'reverse': run(bits_r),
-    'comp':    run(bits_c),
-    'revcomp': run(bits_rc),
+    'forward': fp_from_bits(bits_f),
+    'reverse': fp_from_bits(bits_r),
+    'comp':    fp_from_bits(bits_c),
+    'revcomp': fp_from_bits(bits_rc),
 }
 ```
 
-# ── QUAD CHANNEL BAND BOUNDARIES ─────────────────────────────────────
+# ── BAND STRUCTURE ────────────────────────────────────────────────────
 
-# Eight discrete attractor bands identified by terminal bit pattern.
+# Eight discrete attractor bands, determined by terminal two-bit pattern.
 
-# Boundaries hardcoded with 10% gap buffer to prevent OOR.
-
-# Lower bands (F/R channels): bits_f / bits_r digests
-
-# Upper bands (C/RC channels): bits_c / bits_rc digests
+# Boundaries hardcoded with 10% gap buffer.
 
 # 
 
-# Terminal 2-bit pattern → band:
+# Band  Terminal  Transition           Half   B  C
 
-# (1,0) single alternation into 0  → bands 1, 5
+# 1    (1,0)     alternation -> 0     Lower  0  0
 
-# (0,0) consecutive 0s             → bands 2, 6
+# 2    (0,0)     consecutive 0s       Lower  0  0
 
-# (1,1) consecutive 1s             → bands 3, 7
+# 3    (1,1)     consecutive 1s       Lower  0  1
 
-# (0,1) single alternation into 1  → bands 4, 8
+# 4    (0,1)     alternation -> 1     Lower  0  1
 
-# 
+# 5    (1,0)     alternation -> 0     Upper  1  0
 
-# B,C coding: bands 1-4 → B=0,C=0/1/1/0  bands 5-8 → B=1,C=0/1/1/0
+# 6    (0,0)     consecutive 0s       Upper  1  0
+
+# 7    (1,1)     consecutive 1s       Upper  1  1
+
+# 8    (0,1)     alternation -> 1     Upper  1  1
 
 BAND_BOUNDARIES = [
-(0.08636316488056, 0.08645049942242),  # band 1: lower, terminal (1,0)
-(0.08648981066002, 0.08657545468422),  # band 2: lower, terminal (0,0)
-(0.08669545053069, 0.08678420037717),  # band 3: lower, terminal (1,1)
-(0.08682443149389, 0.08691142795026),  # band 4: lower, terminal (0,1)
-(0.08781118962651, 0.08790084886874),  # band 5: upper, terminal (1,0)
-(0.08794169894719, 0.08802964069811),  # band 6: upper, terminal (0,0)
-(0.08815360499332, 0.08824478706384),  # band 7: upper, terminal (1,1)
-(0.08828655569850, 0.08837595523818),  # band 8: upper, terminal (0,1)
+(0.08636316488056, 0.08645049942242),  # band 1
+(0.08648981066002, 0.08657545468422),  # band 2
+(0.08669545053069, 0.08678420037717),  # band 3
+(0.08682443149389, 0.08691142795026),  # band 4
+(0.08781118962651, 0.08790084886874),  # band 5
+(0.08794169894719, 0.08802964069811),  # band 6
+(0.08815360499332, 0.08824478706384),  # band 7
+(0.08828655569850, 0.08837595523818),  # band 8
 ]
 
 def digest_band(digest):
-“”“Return band index 1-8 for a digest value, or 0 if in gap.”””
+“”“Band index 1-8, or 0 if digest falls in a gap.”””
 for i, (lo, hi) in enumerate(BAND_BOUNDARIES):
 if lo <= digest <= hi:
 return i + 1
@@ -216,29 +210,17 @@ return 0
 
 def band_bc(band):
 “””
-Return (B, C) coding for a band.
-Lower bands (1-4): B=0.  Upper bands (5-8): B=1.
-Terminal pattern within half: (1,0)->C=0, (0,0)->C=0, (1,1)->C=1, (0,1)->C=1
-L,M channels code 0 for B,C respectively.
-O,P channels code 1 for B,C respectively.
+Recover B, C from band index without stored overhead.
+Lower half (bands 1-4): B=0.  Upper half (bands 5-8): B=1.
+Within each half: positions 1,2 -> C=0;  positions 3,4 -> C=1.
 “””
-if band == 0:
+if not band:
 return None, None
 B = 0 if band <= 4 else 1
-# within each half: bands 1,2 (or 5,6) → C=0; bands 3,4 (or 7,8) → C=1
-offset = (band - 1) % 4  # 0,1,2,3
-C = 0 if offset < 2 else 1
+C = 0 if (band - 1) % 4 < 2 else 1
 return B, C
 
-def clustering_rate(idx):
-“”“Compute D* clustering rate for an index.”””
-exact_freq = defaultdict(list)
-for pid, e in idx.items():
-exact_freq[e[‘digest’]].append(pid)
-clustered = sum(len(v) for v in exact_freq.values() if len(v) > 1)
-return 100 * clustered / len(idx), exact_freq
-
-# ── MUSICAL ENCODING CONVENTION ───────────────────────────────────────
+# ── MUSICAL ENCODING ──────────────────────────────────────────────────
 
 # Naturals : C D E F G A B
 
@@ -246,11 +228,9 @@ return 100 * clustered / len(idx), exact_freq
 
 # Sharps   : Cs Ds Es Fs Gs As Bs
 
-# Concatenate note names directly — no separators
+# Concatenate note names directly, no separators.
 
-# e.g. D-flat major opening of Clair de Lune : “AbAbAbFEbDb”
-
-# G major Bach with F#                        : “GDBGDBFs”
+# e.g. D-flat major opening of Clair de Lune: “AbAbAbFEbDb”
 
 # ── SELF-TEST ─────────────────────────────────────────────────────────
 
@@ -259,34 +239,31 @@ print(“Canonical iterator — self-test”)
 print()
 
 ```
-# Fixed point
 payload = "the rain in Spain falls mainly on the plain"
-D = fixed_point(payload)
+D       = fixed_point(payload)
 D_check, _, _ = encode_node(payload, D)
 print(f"Payload : '{payload}'")
 print(f"D*      : {D:.14f}")
-print(f"Closes  : {abs(D_check - D) < 1e-14} ✓")
+print(f"Closes  : {abs(D_check - D) < 1e-14} \u2713")
 print()
 
-# J-stream ternary compliance
 _, J, N = encode_node(payload)
-violations = [j for j in J if j not in (-1, 0, 1)]
+bad = [j for j in J if j not in (-1, 0, 1)]
 print(f"J-stream N={N}  -1:{J.count(-1)}  0:{J.count(0)}  +1:{J.count(1)}")
-print(f"Ternary  : {'PASS ✓' if not violations else 'FAIL ' + str(violations[:5])}")
+print(f"Ternary  : {'PASS \u2713' if not bad else 'FAIL ' + str(bad[:5])}")
 print()
 
-# Rhyme detection
 pairs = [("rain", "Spain"), ("rain", "plain"), ("cat", "rat"), ("cat", "dog")]
 print("Rhyme detection:")
 for p1, p2 in pairs:
-    d = d_star(p1, p2)
-    print(f"  {p1}/{p2}: {d:.6e} {'← rhyme' if d < 1e-10 else ''}")
+    d = d_star_distance(p1, p2)
+    tag = "\u2190 rhyme" if d < 1e-10 else ""
+    print(f"  {p1}/{p2}: {d:.6e} {tag}")
 print()
 
-# Palindrome identity
-print("Palindrome |D*_forward − D*_reverse|:")
+print("Palindrome |D*_forward \u2212 D*_reverse|:")
 for p in ["racecar", "level", "madam"]:
     q    = quad_channel(p)
     diff = abs(q['forward'] - q['reverse'])
-    print(f"  {p}: {diff:.6e} {'✓' if diff < 1e-10 else ''}")
+    print(f"  {p}: {diff:.6e} {'\u2713' if diff < 1e-13 else ''}")
 ```
