@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iterator · Word-Level Digest · Loss Curve</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #f2f2f7;
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+    padding: 20px 14px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    max-width: 640px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+  }
+  .header { padding: 24px 24px 18px; border-bottom: 1px solid #f0f0f5; }
+  .eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #aeaeb2; margin-bottom: 7px; }
+  .title { font-size: 21px; font-weight: 700; color: #1c1c1e; letter-spacing: -0.02em; margin-bottom: 5px; }
+  .subtitle { font-size: 12px; color: #8e8e93; line-height: 1.6; margin-bottom: 12px; }
+  .pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .pill { background: #f2f2f7; border-radius: 20px; padding: 3px 9px; font-size: 10px; color: #6e6e73; font-weight: 500; }
+  .section { padding: 20px 24px; border-bottom: 1px solid #f0f0f5; }
+  .section:last-child { border-bottom: none; }
+  .section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aeaeb2; margin-bottom: 14px; }
+  svg { display: block; width: 100%; height: auto; }
+  .legend { display: flex; gap: 18px; font-size: 11px; color: #8e8e93; margin-bottom: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .phase-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .phase-cell { border-radius: 12px; padding: 12px 14px; }
+  .phase-label { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 5px; }
+  .phase-ep { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .phase-desc { font-size: 11px; line-height: 1.55; color: #6e6e73; }
+  .result-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .result-cell { background: #f9f9fb; border-radius: 12px; padding: 12px 14px; }
+  .result-label { font-size: 10px; color: #aeaeb2; margin-bottom: 4px; font-weight: 500; }
+  .result-value { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #1c1c1e; }
+  .result-sub { font-size: 10px; color: #aeaeb2; margin-top: 2px; }
+  .footer { padding: 14px 24px; background: #f9f9fb; border-top: 1px solid #f0f0f5; display: flex; justify-content: space-between; }
+  .footer span { font-size: 11px; color: #aeaeb2; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="eyebrow">Quadratic Iterator · Word-Level Digest · Archived Result</div>
+    <div class="title">Cross-Corpus Transfer · Genesis → Alice</div>
+    <div class="subtitle">
+      Unlearned fixed input · one token per word · ASCII bytes + D* digest co-resident in D=32 vector<br>
+      Train: Genesis Ch.1–10 (1,743 words) · Test: Alice Ch.I (872 words)
+    </div>
+    <div class="pills">
+      <span class="pill">D=32</span>
+      <span class="pill">CTX=32 words</span>
+      <span class="pill">QKV(16/16)</span>
+      <span class="pill">256×2 MLP</span>
+      <span class="pill">unlearned</span>
+      <span class="pill">lr=2e-4</span>
+      <span class="pill">100 epochs</span>
+      <span class="pill">Vw=351</span>
+    </div>
+  </div>
+
+  <!-- Main chart -->
+
+  <div class="section">
+    <div class="legend">
+      <div class="legend-item">
+        <svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke="#1c1c1e" stroke-width="2" stroke-dasharray="4,3"/></svg>
+        Train · Genesis
+      </div>
+      <div class="legend-item">
+        <svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke="#e53935" stroke-width="2"/></svg>
+        Test · Alice Ch.I
+      </div>
+      <div class="legend-item" style="margin-left:auto;font-size:10px;color:#aeaeb2">
+        random baseline = 5.861
+      </div>
+    </div>
+    <div id="chart"></div>
+
+```
+<!-- Phase annotations -->
+<div class="phase-row">
+  <div class="phase-cell" style="background:#fff5f5">
+    <div class="phase-label" style="color:#e53935">Phase I · Memorisation</div>
+    <div class="phase-ep" style="color:#e53935">Ep 1–60</div>
+    <div class="phase-desc">Train descends 5.06→3.81. Test diverges to 9.26. Model locks onto Genesis vocabulary. Gap reaches +5.4.</div>
+  </div>
+  <div class="phase-cell" style="background:#fff8f0">
+    <div class="phase-label" style="color:#ff9500">Phase II · Collapse</div>
+    <div class="phase-ep" style="color:#ff9500">Ep 60–76</div>
+    <div class="phase-desc">Train rises 3.81→6.18. Adam momentum overwhelms. Genesis attractor broken. Necessary boundary condition.</div>
+  </div>
+  <div class="phase-cell" style="background:#f0fff4">
+    <div class="phase-label" style="color:#34c759">Phase III · Real Learning</div>
+    <div class="phase-ep" style="color:#34c759">Ep 76–100</div>
+    <div class="phase-desc">Both curves converge. Gap compresses to +0.28. Digest geometry — not vocabulary — becomes the signal.</div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- Results -->
+
+  <div class="section">
+    <div class="section-label">Final state · Epoch 100</div>
+    <div class="result-row">
+      <div class="result-cell">
+        <div class="result-label">Train loss · Genesis</div>
+        <div class="result-value">4.8723</div>
+        <div class="result-sub">signal 0.9885 nats</div>
+      </div>
+      <div class="result-cell">
+        <div class="result-label">Test loss · Alice</div>
+        <div class="result-value" style="color:#e53935">5.1484</div>
+        <div class="result-sub">signal 0.7124 nats</div>
+      </div>
+      <div class="result-cell">
+        <div class="result-label">Gap · generalisation</div>
+        <div class="result-value" style="color:#ff9500">+0.276</div>
+        <div class="result-sub">random baseline 5.861</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Phillip Somerville · @unitambo · 2026</span>
+    <span>Word-Level Digest · v1.0 · unlearned · Genesis→Alice</span>
+  </div>
+</div>
+
+<script>
+// ── Data from run log ─────────────────────────────────────
+const TR = [5.0605,4.8013,4.7674,4.7504,4.7327,4.6991,4.6660,4.6378,4.6135,4.6015,4.5801,4.5608,4.5411,4.5238,4.5031,4.4840,4.4698,4.4462,4.4216,4.4003,4.3825,4.3599,4.3373,4.3196,4.3033,4.2803,4.2668,4.2510,4.2381,4.2142,4.2013,4.1836,4.1662,4.1567,4.1336,4.1320,4.1134,4.0988,4.0853,4.0665,4.0665,4.0421,4.0377,4.0224,4.0224,4.0026,3.9919,3.9747,3.9491,3.9487,3.9400,3.9384,3.9412,3.9270,3.9014,3.8688,3.8554,3.8408,3.8065,3.8114,3.7725,3.7547,3.7259,3.7151,3.7349,3.8242,3.9399,4.0652,4.2786,4.7144,5.2463,5.6089,5.8852,6.0492,6.1776,5.9522,5.7097,5.6457,5.3896,5.1854,4.9937,4.9811,4.9718,4.9019,4.8967,4.8841,4.8634,4.8884,4.9044,4.9072,4.9518,4.9148,4.8989,4.9122,4.9100,4.9375,4.9068,4.8982,4.8771,4.8723];
+const TE = [4.9203,4.9353,5.0385,4.9663,5.0410,5.0394,5.0865,5.1120,5.1794,5.2070,5.1965,5.3962,5.3264,5.3935,5.4201,5.5835,5.4704,5.8291,5.5963,5.8853,5.7831,5.9353,6.1282,6.0126,6.2896,5.9869,6.3754,6.3103,6.6955,6.6395,6.5919,6.6195,6.9071,6.9255,7.1087,7.5374,6.9700,7.1880,7.1978,7.5833,7.7543,7.7019,7.6263,7.7127,7.6719,7.7638,7.9803,8.1349,7.9797,8.0707,8.7172,7.9875,8.1883,8.4518,8.5807,8.7497,8.5568,8.8433,8.8227,9.2601,8.7037,8.3263,8.9723,8.8344,8.8675,8.8305,8.9870,8.7469,8.9989,8.4533,9.6527,10.1966,9.4345,8.8575,8.0786,6.9077,6.2740,6.7653,6.4594,5.7538,5.1812,5.3597,5.0009,5.4432,5.5664,5.1923,5.2663,5.3826,5.2653,5.7154,5.3209,5.1845,4.9720,5.1230,5.1231,5.2187,5.0990,5.1913,5.6013,5.1484];
+const RANDOM = 5.8608;
+
+// ── Draw chart ────────────────────────────────────────────
+(function(){
+  const W=592, H=280, PL=46, PR=16, PT=20, PB=32;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const n=TR.length;
+  const all=[...TR,...TE,RANDOM];
+  const minL=Math.min(...all)*0.97;
+  const maxL=Math.max(...all)*1.03;
+
+  const xS=i=>PL+(i/Math.max(n-1,1))*cW;
+  const yS=v=>PT+(1-(v-minL)/(maxL-minL+1e-9))*cH;
+
+  function el(tag,attrs,text){
+    const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    if(attrs)Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));
+    if(text!==undefined)e.textContent=text;
+    return e;
+  }
+  function path(data,color,dash){
+    const d=data.map((v,i)=>`${i===0?'M':'L'}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(' ');
+    const p=el('path',{d,fill:'none',stroke:color,'stroke-width':'2','stroke-linecap':'round'});
+    if(dash)p.setAttribute('stroke-dasharray',dash);
+    return p;
+  }
+
+  const svg=el('svg',{viewBox:`0 0 ${W} ${H}`});
+  svg.style.cssText='display:block;width:100%;height:auto;';
+
+  svg.appendChild(el('rect',{width:W,height:H,fill:'white'}));
+
+  // Phase background bands
+  const phases=[
+    {x0:0,  x1:59, color:'rgba(229,57,53,0.04)',  label:'I · Memorisation'},
+    {x0:59, x1:75, color:'rgba(255,149,0,0.06)',  label:'II · Collapse'},
+    {x0:75, x1:99, color:'rgba(52,199,89,0.05)',  label:'III · Real Learning'},
+  ];
+  phases.forEach(p=>{
+    const x1=xS(p.x0), x2=xS(p.x1);
+    svg.appendChild(el('rect',{x:x1,y:PT,width:x2-x1,height:cH,fill:p.color}));
+  });
+
+  // y grid
+  [0,0.2,0.4,0.6,0.8,1].forEach(t=>{
+    const v=minL+(maxL-minL)*t, y=yS(v);
+    svg.appendChild(el('line',{x1:PL,y1:y,x2:PL+cW,y2:y,stroke:'#f0f0f5'}));
+    svg.appendChild(el('text',{x:PL-5,y:y+4,'text-anchor':'end','font-size':'9',fill:'#aeaeb2','font-family':'system-ui'},v.toFixed(1)));
+  });
+
+  // x ticks
+  [10,20,30,40,50,60,70,80,90,100].forEach(e=>{
+    const x=xS(e-1);
+    svg.appendChild(el('line',{x1:x,y1:PT,x2:x,y2:PT+cH,stroke:'#f5f5f7'}));
+    svg.appendChild(el('text',{x,y:PT+cH+14,'text-anchor':'middle','font-size':'9',fill:'#aeaeb2','font-family':'system-ui'},e));
+  });
+
+  // axes
+  svg.appendChild(el('line',{x1:PL,y1:PT,x2:PL,y2:PT+cH,stroke:'#e5e5ea'}));
+  svg.appendChild(el('line',{x1:PL,y1:PT+cH,x2:PL+cW,y2:PT+cH,stroke:'#e5e5ea'}));
+
+  // random baseline
+  svg.appendChild(el('line',{x1:PL,y1:yS(RANDOM),x2:PL+cW,y2:yS(RANDOM),stroke:'#d1d1d6','stroke-dasharray':'4,4'}));
+  svg.appendChild(el('text',{x:PL+cW-2,y:yS(RANDOM)-5,'text-anchor':'end','font-size':'8',fill:'#c7c7cc','font-family':'system-ui'},`random ${RANDOM.toFixed(3)}`));
+
+  // phase boundary lines
+  [59,75].forEach(i=>{
+    svg.appendChild(el('line',{x1:xS(i),y1:PT,x2:xS(i),y2:PT+cH,stroke:'#d1d1d6','stroke-width':'1','stroke-dasharray':'2,4'}));
+  });
+
+  // phase labels at top
+  const phaseLabels=[
+    {x:xS(29), label:'Memorisation', color:'#e53935'},
+    {x:xS(67), label:'Collapse',     color:'#ff9500'},
+    {x:xS(87), label:'Recovery',     color:'#34c759'},
+  ];
+  phaseLabels.forEach(p=>{
+    svg.appendChild(el('text',{x:p.x,y:PT-5,'text-anchor':'middle','font-size':'9','font-weight':'600',fill:p.color,'font-family':'system-ui'},p.label));
+  });
+
+  // curves
+  svg.appendChild(path(TR,'#1c1c1e','4,3'));
+  svg.appendChild(path(TE,'#e53935'));
+
+  // end dots + labels
+  [[TR,'#1c1c1e'],[TE,'#e53935']].forEach(([data,color])=>{
+    const v=data[data.length-1];
+    svg.appendChild(el('circle',{cx:xS(data.length-1),cy:yS(v),r:'3.5',fill:color}));
+    svg.appendChild(el('text',{x:xS(data.length-1)+6,y:yS(v)+4,'font-size':'10','font-weight':'600',fill:color,'font-family':'system-ui'},v.toFixed(3)));
+  });
+
+  // collapse peak annotation
+  const peakEp=71, peakVal=TE[70];
+  const px=xS(peakEp), py=yS(peakVal);
+  svg.appendChild(el('circle',{cx:px,cy:py,r:'4',fill:'none',stroke:'#ff9500','stroke-width':'1.5'}));
+  svg.appendChild(el('text',{x:px-6,y:py-8,'text-anchor':'middle','font-size':'8',fill:'#ff9500','font-family':'system-ui'},'peak 10.20'));
+
+  // axis labels
+  svg.appendChild(el('text',{x:PL+cW/2,y:H-2,'text-anchor':'middle','font-size':'9',fill:'#aeaeb2','font-family':'system-ui'},'Epoch'));
+  svg.appendChild(el('text',{x:10,y:PT+cH/2,'text-anchor':'middle','font-size':'9',fill:'#aeaeb2','font-family':'system-ui',transform:`rotate(-90,10,${PT+cH/2})`},'Loss'));
+
+  document.getElementById('chart').appendChild(svg);
+})();
+</script>
+
+</body>
+</html>
