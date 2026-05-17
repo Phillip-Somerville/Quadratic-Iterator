@@ -1,0 +1,555 @@
+// ════════════════════════════════════════════════════════════════════
+// README — CROSS-DOMAIN GENERALISATION TEST · GENESIS → ALICE
+// Phillip Somerville (@unitambo) · 2026
+//
+// RATIONALE
+//   Third generalisation test in the iterator low-res triplet series.
+//   Previous results:
+//     Alice Ch.I→Ch.II:   C gap = −0.277 → clear generalisation
+//     Genesis Ch.1→Ch.11: C gap = −0.003 → balanced transducer
+//       (oscillation damping to zero over last 50 epochs)
+//
+//   The balanced transducer behaviour at Genesis scale raises a key
+//   question: is the zero-drift a corpus-specific equilibrium, or
+//   does the iterator’s structural prior hold across genuinely
+//   different registers?
+//
+//   This test is the decisive experiment: train on Genesis (biblical
+//   prose, KJB), test on Alice Ch.I (Victorian narrative fiction).
+//   Different register, vocabulary, sentence rhythm, authorial voice.
+//   Maximum stylistic distance within English prose.
+//
+//   If C gap stays near zero or negative across this domain shift,
+//   the balanced transducer characterisation is confirmed as
+//   register-invariant — a strong claim about the iterator encoding
+//   something genuinely language-invariant rather than genre-specific.
+//
+//   If C gap goes positive, the iterator’s prior is domain-sensitive
+//   and the transducer balance depends on in-distribution text.
+//
+//   CORPUS:
+//     Train: KJB Genesis Ch.1–10  (~7,800 words, biblical prose)
+//     Test:  Alice in Wonderland Ch.I (~870 words, Victorian fiction)
+//
+//   CONDITIONS (identical across all runs in series):
+//     C — Averaged quad channel [mean_b0, mean_b1] + scalar D*
+//         digest at word boundaries. D=3 fixed input.
+//     A — Raw triplet tokens, learned D=3 embedding. Baseline.
+//     R — Random D=3 Gaussian noise. Fixed input control.
+//
+//   ARCHITECTURE: D=3, CTX=32, 128×2 MLP, Adam lr=0.003, 100 epochs
+// ════════════════════════════════════════════════════════════════════
+
+import { useState, useRef, useCallback } from “react”;
+
+// ── Iterator core ─────────────────────────────────────────────────
+const C_F = 1.094, DELTA = 0.002, PREC = 14;
+
+function tr(x) {
+const s = 10 ** PREC;
+const r = Math.round(x * s) / s;
+return r >= 0 ? Math.floor(r * s) / s : Math.ceil(r * s) / s;
+}
+function textBits(s) {
+const bits = [];
+for (const ch of s.toLowerCase()) {
+const code = ch.charCodeAt(0);
+for (let i = 7; i >= 0; i–) bits.push((code >> i) & 1);
+}
+return bits;
+}
+function encodeF(bits) { return […bits, 0, 0].map(b => C_F + (b ? DELTA : 0)); }
+function quadChannel(FSeq) {
+const ch = []; let prev = null;
+for (const F of FSeq) {
+if (prev === null)                  ch.push([0, 0]);
+else if (F === C_F && prev > C_F)   ch.push([0, 0]);
+else if (F === C_F && prev === C_F) ch.push([0, 1]);
+else if (F > C_F  && prev > C_F)    ch.push([1, 0]);
+else if (F > C_F  && prev === C_F)  ch.push([1, 1]);
+else                                ch.push([0, 1]);
+prev = F;
+}
+return ch;
+}
+function dStar(bits, seed = 0.085) {
+let s = seed, prev = -999;
+for (let it = 0; it < 20; it++) {
+const FSeq = encodeF(bits); let h = tr(s);
+for (const F of FSeq) h = tr((h * h - F) ** 2 - F);
+if (Math.abs(h - prev) < 1e-15) return h;
+prev = h; s = h;
+}
+return prev;
+}
+
+// ── Corpus: KJB Genesis ───────────────────────────────────────────
+const GEN_1_10 = `in the beginning god created the heaven and the earth and the earth was without form and void and darkness was upon the face of the deep and the spirit of god moved upon the face of the waters and god said let there be light and there was light and god saw the light that it was good and god divided the light from the darkness and god called the light day and the darkness he called night and the evening and the morning were the first day and god said let there be a firmament in the midst of the waters and let it divide the waters from the waters and god made the firmament and divided the waters which were under the firmament from the waters which were above the firmament and it was so and god called the firmament heaven and the evening and the morning were the second day and god said let the waters under the heaven be gathered together unto one place and let the dry land appear and it was so and god called the dry land earth and the gathering together of the waters called he seas and god saw that it was good and god said let the earth bring forth grass the herb yielding seed and the fruit tree yielding fruit after his kind whose seed is in itself upon the earth and it was so and the earth brought forth grass and herb yielding seed after his kind and the tree yielding fruit whose seed was in itself after his kind and god saw that it was good and the evening and the morning were the third day and god said let there be lights in the firmament of the heaven to divide the day from the night and let them be for signs and for seasons and for days and years and let them be for lights in the firmament of the heaven to give light upon the earth and it was so and god made two great lights the greater light to rule the day and the lesser light to rule the night he made the stars also and god set them in the firmament of the heaven to give light upon the earth and to rule over the day and over the night and to divide the light from the darkness and god saw that it was good and the evening and the morning were the fourth day and god said let the waters bring forth abundantly the moving creature that hath life and fowl that may fly above the earth in the open firmament of heaven and god created great whales and every living creature that moveth which the waters brought forth abundantly after their kind and every winged fowl after his kind and god saw that it was good and god blessed them saying be fruitful and multiply and fill the waters in the seas and let fowl multiply in the earth and the evening and the morning were the fifth day and god said let the earth bring forth the living creature after his kind cattle and creeping thing and beast of the earth after his kind and it was so and god made the beast of the earth after his kind and cattle after their kind and every thing that creepeth upon the earth after his kind and god saw that it was good and god said let us make man in our image after our likeness and let them have dominion over the fish of the sea and over the fowl of the air and over the cattle and over all the earth and over every creeping thing that creepeth upon the earth so god created man in his own image in the image of god created he him male and female created he them and god blessed them and god said unto them be fruitful and multiply and replenish the earth and subdue it and have dominion over the fish of the sea and over the fowl of the air and over every living thing that moveth upon the earth and god said behold i have given you every herb bearing seed which is upon the face of all the earth and every tree in the which is the fruit of a tree yielding seed to you it shall be for meat and to every beast of the earth and to every fowl of the air and to every thing that creepeth upon the earth wherein there is life i have given every green herb for meat and it was so and god saw every thing that he had made and behold it was very good and the evening and the morning were the sixth day thus the heavens and the earth were finished and all the host of them and on the seventh day god ended his work which he had made and he rested on the seventh day from all his work which he had made and god blessed the seventh day and sanctified it because that in it he had rested from all his work which god created and made these are the generations of the heavens and of the earth when they were created in the day that the lord god made the earth and the heavens and every plant of the field before it was in the earth and every herb of the field before it grew for the lord god had not caused it to rain upon the earth and there was not a man to till the ground but there went up a mist from the earth and watered the whole face of the ground and the lord god formed man of the dust of the ground and breathed into his nostrils the breath of life and man became a living soul and the lord god planted a garden eastward in eden and there he put the man whom he had formed and out of the ground made the lord god to grow every tree that is pleasant to the sight and good for food the tree of life also in the midst of the garden and the tree of knowledge of good and evil and a river went out of eden to water the garden and from thence it was parted and became into four heads the name of the first is pison that is it which compasseth the whole land of havilah where there is gold and the gold of that land is good there is bdellium and the onyx stone and the name of the second river is gihon the same is it that compasseth the whole land of ethiopia and the name of the third river is hiddekel that is it which goeth toward the east of assyria and the fourth river is euphrates and the lord god took the man and put him into the garden of eden to dress it and to keep it and the lord god commanded the man saying of every tree of the garden thou mayest freely eat but of the tree of the knowledge of good and evil thou shalt not eat of it for in the day that thou eatest thereof thou shalt surely die and the lord god said it is not good that the man should be alone i will make him an help meet for him and out of the ground the lord god formed every beast of the field and every fowl of the air and brought them unto adam to see what he would call them and whatsoever adam called every living creature that was the name thereof and adam gave names to all cattle and to the fowl of the air and to every beast of the field but for adam there was not found an help meet for him and the lord god caused a deep sleep to fall upon adam and he slept and he took one of his ribs and closed up the flesh instead thereof and the rib which the lord god had taken from man made he a woman and brought her unto the man and adam said this is now bone of my bones and flesh of my flesh she shall be called woman because she was taken out of man therefore shall a man leave his father and his mother and shall cleave unto his wife and they shall be one flesh and they were both naked the man and his wife and were not ashamed now the serpent was more subtil than any beast of the field which the lord god had made and he said unto the woman yea hath god said ye shall not eat of every tree of the garden and the woman said unto the serpent we may eat of the fruit of the trees of the garden but of the fruit of the tree which is in the midst of the garden god hath said ye shall not eat of it neither shall ye touch it lest ye die and the serpent said unto the woman ye shall not surely die for god doth know that in the day ye eat thereof then your eyes shall be opened and ye shall be as gods knowing good and evil and when the woman saw that the tree was good for food and that it was pleasant to the eyes and a tree to be desired to make one wise she took of the fruit thereof and did eat and gave also unto her husband with her and he did eat and the eyes of them both were opened and they knew that they were naked and they sewed fig leaves together and made themselves aprons and they heard the voice of the lord god walking in the garden in the cool of the day and adam and his wife hid themselves from the presence of the lord god amongst the trees of the garden and the lord god called unto adam and said unto him where art thou and he said i heard thy voice in the garden and i was afraid because i was naked and i hid myself and he said who told thee that thou wast naked hast thou eaten of the tree whereof i commanded thee that thou shouldest not eat and the man said the woman whom thou gavest to be with me she gave me of the tree and i did eat and the lord god said unto the woman what is this that thou hast done and the woman said the serpent beguiled me and i did eat and the lord god said unto the serpent because thou hast done this thou art cursed above all cattle and above every beast of the field upon thy belly shalt thou go and dust shalt thou eat all the days of thy life and i will put enmity between thee and the woman and between thy seed and her seed it shall bruise thy head and thou shalt bruise his heel unto the woman he said i will greatly multiply thy sorrow and thy conception in sorrow thou shalt bring forth children and thy desire shall be to thy husband and he shall rule over thee and unto adam he said because thou hast hearkened unto the voice of thy wife and hast eaten of the tree of which i commanded thee saying thou shalt not eat of it cursed is the ground for thy sake in sorrow shalt thou eat of it all the days of thy life thorns also and thistles shall it bring forth to thee and thou shalt eat the herb of the field in the sweat of thy face shalt thou eat bread till thou return unto the ground for out of it wast thou taken for dust thou art and unto dust shalt thou return and adam called his wife's name eve because she was the mother of all living unto adam also and to his wife did the lord god make coats of skins and clothed them and the lord god said behold the man is become as one of us to know good and evil and now lest he put forth his hand and take also of the tree of life and eat and live for ever therefore the lord god sent him forth from the garden of eden to till the ground from whence he was taken so he drove out the man and he placed at the east of the garden of eden cherubims and a flaming sword which turned every way to keep the way of the tree of life and adam knew eve his wife and she conceived and bare cain and said i have gotten a man from the lord and she again bare his brother abel and abel was a keeper of sheep but cain was a tiller of the ground and in process of time it came to pass that cain brought of the fruit of the ground an offering unto the lord and abel he also brought of the firstlings of his flock and of the fat thereof and the lord had respect unto abel and to his offering but unto cain and to his offering he had not respect and cain was very wroth and his countenance fell and the lord said unto cain why art thou wroth and why is thy countenance fallen if thou doest well shalt thou not be accepted and if thou doest not well sin lieth at the door and unto thee shall be his desire and thou shalt rule over him and cain talked with abel his brother and it came to pass when they were in the field that cain rose up against abel his brother and slew him and the lord said unto cain where is abel thy brother and he said i know not am i my brother's keeper and he said what hast thou done the voice of thy brother's blood crieth unto me from the ground and now art thou cursed from the earth which hath opened her mouth to receive thy brother's blood from thy hand when thou tillest the ground it shall not henceforth yield unto thee her strength a fugitive and a vagabond shalt thou be in the earth and cain said unto the lord my punishment is greater than i can bear behold thou hast driven me out this day from the face of the earth and from thy face shall i be hid and i shall be a fugitive and a vagabond in the earth and it shall come to pass that every one that findeth me shall slay me and the lord said unto him therefore whosoever slayeth cain vengeance shall be taken on him sevenfold and the lord set a mark upon cain lest any finding him should kill him and cain went out from the presence of the lord and dwelt in the land of nod on the east of eden and cain knew his wife and she conceived and bare enoch and he builded a city and called the name of the city after the name of his son enoch and unto enoch was born irad and irad begat mehujael and mehujael begat methusael and methusael begat lamech and lamech took unto him two wives the name of the one was adah and the name of the other zillah and adah bare jabal he was the father of such as dwell in tents and of such as have cattle and his brother's name was jubal he was the father of all such as handle the harp and organ and zillah she also bare tubalcain an instructer of every cutting instrument of brass and iron and the sister of tubalcain was naamah and lamech said unto his wives adah and zillah hear my voice ye wives of lamech hearken unto my speech for i have slain a man to my wounding and a young man to my hurt if cain shall be avenged sevenfold truly lamech seventy and sevenfold and adam knew his wife again and she bare a son and called his name seth for god said she hath appointed me another seed instead of abel whom cain slew and to seth to him also there was born a son and he called his name enos then began men to call upon the name of the lord this is the book of the generations of adam in the day that god created man in the likeness of god made he him male and female created he them and blessed them and called their name adam in the day when they were created and adam lived an hundred and thirty years and begat a son in his own likeness after his image and called his name seth and the days of adam after he had begotten seth were eight hundred years and he begat sons and daughters and all the days that adam lived were nine hundred and thirty years and he died and seth lived an hundred and five years and begat enos and seth lived after he begat enos eight hundred and seven years and begat sons and daughters and all the days of seth were nine hundred and twelve years and he died and enos lived ninety years and begat cainan and enos lived after he begat cainan eight hundred and fifteen years and begat sons and daughters and all the days of enos were nine hundred and five years and he died and cainan lived seventy years and begat mahalaleel and cainan lived after he begat mahalaleel eight hundred and forty years and begat sons and daughters and all the days of cainan were nine hundred and ten years and he died and mahalaleel lived sixty and five years and begat jared and mahalaleel lived after he begat jared eight hundred and thirty years and begat sons and daughters and all the days of mahalaleel were eight hundred ninety and five years and he died and jared lived an hundred sixty and two years and he begat enoch and jared lived after he begat enoch eight hundred years and begat sons and daughters and all the days of jared were nine hundred sixty and two years and he died and enoch lived sixty and five years and begat methuselah and enoch walked with god after he begat methuselah three hundred years and begat sons and daughters and all the days of enoch were three hundred sixty and five years and enoch walked with god and he was not for god took him and methuselah lived an hundred eighty and seven years and begat lamech and methuselah lived after he begat lamech seven hundred eighty and two years and begat sons and daughters and all the days of methuselah were nine hundred sixty and nine years and he died and lamech lived an hundred eighty and two years and begat a son and he called his name noah saying this same shall comfort us concerning our work and toil of our hands because of the ground which the lord hath cursed and lamech lived after he begat noah five hundred ninety and five years and begat sons and daughters and all the days of lamech were seven hundred seventy and seven years and he died and noah was five hundred years old and noah begat shem ham and japheth and it came to pass when men began to multiply on the face of the earth and daughters were born unto them that the sons of god saw the daughters of men that they were fair and they took them wives of all which they chose and the lord said my spirit shall not always strive with man for that he also is flesh yet his days shall be an hundred and twenty years there were giants in the earth in those days and also after that when the sons of god came in unto the daughters of men and they bare children to them the same became mighty men which were of old men of renown and god saw that the wickedness of man was great in the earth and that every imagination of the thoughts of his heart was only evil continually and it repented the lord that he had made man on the earth and it grieved him at his heart and the lord said i will destroy man whom i have created from the face of the earth both man and beast and the creeping thing and the fowls of the air for it repenteth me that i have made them but noah found grace in the eyes of the lord these are the generations of noah noah was a just man and perfect in his generations and noah walked with god and noah begat three sons shem ham and japheth the earth also was corrupt before god and the earth was filled with violence and god looked upon the earth and behold it was corrupt for all flesh had corrupted his way upon the earth and god said unto noah the end of all flesh is come before me for the earth is filled with violence through them and behold i will destroy them with the earth make thee an ark of gopher wood rooms shalt thou make in the ark and shalt pitch it within and without with pitch and this is the fashion which thou shalt make it of the length of the ark shall be three hundred cubits the breadth of it fifty cubits and the height of it thirty cubits a window shalt thou make to the ark and in a cubit shalt thou finish it above and the door of the ark shalt thou set in the side thereof with lower second and third stories shalt thou make it and behold i even i do bring a flood of waters upon the earth to destroy all flesh wherein is the breath of life from under heaven and every thing that is in the earth shall die but with thee will i establish my covenant and thou shalt come into the ark thou and thy sons and thy wife and thy sons wives with thee and of every living thing of all flesh two of every sort shalt thou bring into the ark to keep them alive with thee they shall be male and female of fowls after their kind and of cattle after their kind of every creeping thing of the earth after his kind two of every sort shall come unto thee to keep them alive and take thou unto thee of all food that is eaten and thou shalt gather it to thee and it shall be for food for thee and for them thus did noah according to all that god commanded him so did he and the lord said unto noah come thou and all thy house into the ark for thee have i seen righteous before me in this generation of every clean beast thou shalt take to thee by sevens the male and his female and of beasts that are not clean by two the male and his female of fowls also of the air by sevens the male and the female to keep seed alive upon the face of all the earth for yet seven days and i will cause it to rain upon the earth forty days and forty nights and every living substance that i have made will i destroy from off the face of the earth and noah did according unto all that the lord commanded him and noah was six hundred years old when the flood of waters was upon the earth and noah went in and his sons and his wife and his sons wives with him into the ark because of the waters of the flood of clean beasts and of beasts that are not clean and of fowls and of every thing that creepeth upon the earth there went in two and two unto noah into the ark the male and the female as god had commanded noah and it came to pass after seven days that the waters of the flood were upon the earth in the six hundredth year of noah's life in the second month the seventeenth day of the month the same day were all the fountains of the great deep broken up and the windows of heaven were opened and the rain was upon the earth forty days and forty nights in the selfsame day entered noah and shem and ham and japheth the sons of noah and noah's wife and the three wives of his sons with them into the ark they and every beast after his kind and all the cattle after their kind and every creeping thing that creepeth upon the earth after his kind and every fowl after his kind every bird of every sort and they went in unto noah into the ark two and two of all flesh wherein is the breath of life and they that went in went in male and female of all flesh as god had commanded him and the lord shut him in and the flood was forty days upon the earth and the waters increased and bare up the ark and it was lift up above the earth and the waters prevailed and were increased greatly upon the earth and the ark went upon the face of the waters and the waters prevailed exceedingly upon the earth and all the high hills that were under the whole heaven were covered fifteen cubits upward did the waters prevail and the mountains were covered and all flesh died that moved upon the earth both of fowl and of cattle and of beast and of every creeping thing that creepeth upon the earth and every man all in whose nostrils was the breath of life of all that was in the dry land died and every living substance was destroyed which was upon the face of the ground both man and cattle and the creeping things and the fowl of the heaven and they were destroyed from the earth and noah only remained alive and they that were with him in the ark and the waters prevailed upon the earth an hundred and fifty days and god remembered noah and every living thing and all the cattle that was with him in the ark and god made a wind to pass over the earth and the waters assuaged the fountains also of the deep and the windows of heaven were stopped and the rain from heaven was restrained and the waters returned from off the earth continually and after the end of the hundred and fifty days the waters were abated and the ark rested in the seventh month on the seventeenth day of the month upon the mountains of ararat and the waters decreased continually until the tenth month in the tenth month on the first day of the month were the tops of the mountains seen and it came to pass at the end of forty days that noah opened the window of the ark which he had made and he sent forth a raven which went forth to and fro until the waters were dried up from off the earth also he sent forth a dove from him to see if the waters were abated from off the face of the ground but the dove found no rest for the sole of her foot and she returned unto him into the ark for the waters were on the face of the whole earth then he put forth his hand and took her and pulled her in unto him into the ark and he stayed yet other seven days and again he sent forth the dove out of the ark and the dove came in to him in the evening and lo in her mouth was an olive leaf pluckt off so noah knew that the waters were abated from off the earth and he stayed yet other seven days and sent forth the dove which returned not again unto him any more and it came to pass in the six hundredth and first year in the first month the first day of the month the waters were dried up from off the earth and noah removed the covering of the ark and looked and behold the face of the ground was dry and in the second month on the seven and twentieth day of the month was the earth dried and god spake unto noah saying go forth of the ark thou and thy wife and thy sons and thy sons wives with thee bring forth with thee every living thing that is with thee of all flesh both of fowl and of cattle and of every creeping thing that creepeth upon the earth that they may breed abundantly in the earth and be fruitful and multiply upon the earth and noah went forth and his sons and his wife and his sons wives with him every beast every creeping thing and every fowl and whatsoever creepeth upon the earth after their kinds went forth out of the ark and noah builded an altar unto the lord and took of every clean beast and of every clean fowl and offered burnt offerings on the altar and the lord smelled a sweet savour and the lord said in his heart i will not again curse the ground any more for man's sake for the imagination of man's heart is evil from his youth neither will i again smite any more every thing living as i have done while the earth remaineth seedtime and harvest and cold and heat and summer and winter and day and night shall not cease and god blessed noah and his sons and said unto them be fruitful and multiply and replenish the earth and the fear of you and the dread of you shall be upon every beast of the earth and upon every fowl of the air upon all that moveth upon the earth and upon all the fishes of the sea into your hand are they delivered every moving thing that liveth shall be meat for you even as the green herb have i given you all things but flesh with the life thereof which is the blood thereof shall ye not eat and surely your blood of your lives will i require at the hand of every beast will i require it and at the hand of man at the hand of every man's brother will i require the life of man whoso sheddeth man's blood by man shall his blood be shed for in the image of god made he man and you be ye fruitful and multiply bring forth abundantly in the earth and multiply therein and god spake unto noah and to his sons with him saying and i behold i establish my covenant with you and with your seed after you and with every living creature that is with you of the fowl of the cattle and of every beast of the earth with you from all that go out of the ark to every beast of the earth and i will establish my covenant with you neither shall all flesh be cut off any more by the waters of a flood neither shall there any more be a flood to destroy the earth and god said this is the token of the covenant which i make between me and you and every living creature that is with you for perpetual generations i do set my bow in the cloud and it shall be for a token of a covenant between me and the earth and it shall come to pass when i bring a cloud over the earth that the bow shall be seen in the cloud and i will remember my covenant which is between me and you and every living creature of all flesh and the waters shall no more become a flood to destroy all flesh and the bow shall be in the cloud and i will look upon it that i may remember the everlasting covenant between god and every living creature of all flesh that is upon the earth and god said unto noah this is the token of the covenant which i have established between me and all flesh that is upon the earth and the sons of noah that went forth of the ark were shem and ham and japheth and ham is the father of canaan these are the three sons of noah and of them was the whole earth overspread and noah began to be an husbandman and he planted a vineyard and he drank of the wine and was drunken and he was uncovered within his tent and ham the father of canaan saw the nakedness of his father and told his two brethren without and shem and japheth took a garment and laid it upon both their shoulders and went backward and covered the nakedness of their father and their faces were backward and they saw not their father's nakedness and noah awoke from his wine and knew what his younger son had done unto him and he said cursed be canaan a servant of servants shall he be unto his brethren and he said blessed be the lord god of shem and canaan shall be his servant god shall enlarge japheth and he shall dwell in the tents of shem and canaan shall be his servant and noah lived after the flood three hundred and fifty years and all the days of noah were nine hundred and fifty years and he died`;
+
+const ALICE_CH1 = `alice was beginning to get very tired of sitting by her sister on the bank and of having nothing to do once or twice she had peeped into the book her sister was reading but it had no pictures or conversations in it and what is the use of a book thought alice without pictures or conversations so she was considering in her own mind as well as she could for the hot day made her feel very sleepy and stupid whether the pleasure of making a daisy chain would be worth the trouble of getting up and picking the daisies when suddenly a white rabbit with pink eyes ran close by her there was nothing so very remarkable in that nor did alice think it so very much out of the way to hear the rabbit say to itself oh dear oh dear i shall be late but when the rabbit actually took a watch out of its waistcoat pocket and looked at it and then hurried on alice started to her feet for it flashed across her mind that she had never before seen a rabbit with either a waistcoat pocket or a watch to take out of it and burning with curiosity she ran across the field after it and was just in time to see it pop down a large rabbit hole under the hedge in another moment down went alice after it the rabbit hole went straight on like a tunnel for some way and then dipped suddenly down so suddenly that alice had not a moment to think about stopping herself before she found herself falling down a very deep well either the well was very deep or she fell very slowly for she had plenty of time as she went down to look about her and to wonder what was going to happen next first she tried to look down and make out what she was coming to but it was too dark to see anything then she looked at the sides of the well and noticed that they were filled with cupboards and book shelves here and there she saw maps and pictures hung upon pegs she took down a jar from one of the shelves as she passed it was labelled orange marmalade but to her great disappointment it was empty she did not like to drop the jar for fear of killing somebody underneath so managed to put it into one of the cupboards as she fell past it down down down would the fall never come to an end there was nothing else to do so alice soon began talking again dinah will miss me very much tonight i should think dinah was the cat i hope they will remember her saucer of milk at teatime dinah my dear i wish you were down here with me there are no mice in the air i am afraid but you might catch a bat and that is very like a mouse you know but do cats eat bats i wonder and here alice began to get rather sleepy and went on saying to herself in a dreamy sort of way do cats eat bats do cats eat bats and sometimes do bats eat cats for you see as she could not answer either question it did not much matter which way she put it she felt that she was dozing off and had just begun to dream that she was walking hand in hand with dinah when suddenly thump thump down she came upon a heap of sticks and dry leaves and the fall was over alice was not a bit hurt and she jumped up on to her feet in a moment she looked up but it was all dark overhead before her was another long passage and the white rabbit was still in sight hurrying down it there was not a moment to be lost away went alice like the wind and was just in time to hear it say as it turned a corner oh my ears and whiskers how late it is getting she was close behind it when she turned the corner but the rabbit was no longer to be seen she found herself in a long low hall which was lit up by a row of lamps hanging from the roof there were doors all round the hall but they were all locked and when alice had been all the way down one side and up the other trying every door she walked sadly down the middle wondering how she was ever to get out again suddenly she came upon a little table all made of solid glass there was nothing on it but a tiny golden key and alice thought it might belong to one of the doors of the hall but the locks were too large or the key was too small and it would not open any of them however on the second time round she came upon a low curtain she had not noticed before and behind it was a little door about fifteen inches high she tried the little golden key in the lock and to her great delight it fitted`;
+
+// ── Build token sequences ─────────────────────────────────────────
+function buildData(text) {
+const s = text.toLowerCase();
+const words = s.match(/[a-z’]+/g) || [];
+const triplets = [];
+for (let i = 0; i + 3 <= s.length; i += 3) triplets.push(s.slice(i, i + 3));
+const digests = words.map(w => dStar(textBits(w)));
+const bits = textBits(s);
+const quad = quadChannel(encodeF(bits));
+const wordEndSet = new Set();
+let charPos = 0;
+for (const w of words) { charPos += w.length; wordEndSet.add(Math.floor(charPos / 3)); charPos++; }
+function tripletWord(ti) {
+let cp = ti * 3, cumul = 0;
+for (let wi = 0; wi < words.length; wi++) { cumul += words[wi].length + 1; if (cp < cumul) return wi; }
+return words.length - 1;
+}
+function nextWord(ti) {
+const cp = (ti + 1) * 3; let cumul = 0;
+for (let wi = 0; wi < words.length; wi++) { cumul += words[wi].length + 1; if (cp <= cumul) return Math.min(wi + 1, words.length - 1); }
+return words.length - 1;
+}
+const N = triplets.length;
+const iterX = [];
+for (let ti = 0; ti < N; ti++) {
+const chunk = quad.slice(ti * 24, Math.min((ti + 1) * 24, quad.length));
+const len = chunk.length || 1;
+const mb0 = chunk.reduce((a, q) => a + q[0], 0) / len;
+const mb1 = chunk.reduce((a, q) => a + q[1], 0) / len;
+const wi = tripletWord(ti);
+const d = wordEndSet.has(ti) ? digests[Math.min(wi, digests.length - 1)] : 0.0;
+iterX.push([mb0, mb1, d]);
+}
+const targets = Array.from({ length: N }, (_, ti) => nextWord(ti));
+return { triplets, iterX, targets, words, N };
+}
+
+// ── Seeded RNG ────────────────────────────────────────────────────
+let _rng = 42;
+function resetRng(s = 42) { _rng = s >>> 0; }
+function rand() { _rng = (Math.imul(_rng, 1664525) + 1013904223) >>> 0; return _rng / 0x100000000; }
+function randn() {
+const u = 1 - rand(), v = rand();
+return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// ── Model ─────────────────────────────────────────────────────────
+const DIM = 3, MLP_H = 128, CTX = 32, EPOCHS = 100, LR = 0.003;
+
+function buildModel(Vw, Vt) {
+const h = (r, c) => { const w = new Float64Array(r * c); const sc = Math.sqrt(2 / c); for (let i = 0; i < w.length; i++) w[i] = randn() * sc; return w; };
+const sm = (r, c) => { const w = new Float64Array(r * c); for (let i = 0; i < w.length; i++) w[i] = randn() * 0.02; return w; };
+const z = n => new Float64Array(n);
+return {
+E: h(Vt, DIM), mE: z(Vt*DIM), vE: z(Vt*DIM),
+Wq: sm(DIM,DIM), mWq: z(DIM*DIM), vWq: z(DIM*DIM),
+Wk: sm(DIM,DIM), mWk: z(DIM*DIM), vWk: z(DIM*DIM),
+Wv: sm(DIM,DIM), mWv: z(DIM*DIM), vWv: z(DIM*DIM),
+Wo: sm(DIM,DIM), mWo: z(DIM*DIM), vWo: z(DIM*DIM),
+W1: h(DIM,MLP_H), mW1: z(DIM*MLP_H), vW1: z(DIM*MLP_H), b1: z(MLP_H), mb1: z(MLP_H), vb1: z(MLP_H),
+W2: h(MLP_H,DIM), mW2: z(MLP_H*DIM), vW2: z(MLP_H*DIM), b2: z(DIM), mb2: z(DIM), vb2: z(DIM),
+Wp: sm(DIM,Vw), mWp: z(DIM*Vw), vWp: z(DIM*Vw),
+t: 0, Vw, Vt,
+};
+}
+
+function smx(arr, n) {
+let mx = -Infinity; for (let i = 0; i < n; i++) if (arr[i] > mx) mx = arr[i];
+let s = 0; const o = new Float64Array(n);
+for (let i = 0; i < n; i++) { o[i] = Math.exp(arr[i] - mx); s += o[i]; }
+for (let i = 0; i < n; i++) o[i] /= s;
+return o;
+}
+
+function adam(p, g, m, v, t, lr) {
+const b1=0.9, b2=0.999, eps=1e-8, bc1=1-b1**t, bc2=1-b2**t;
+for (let i = 0; i < p.length; i++) {
+const gi = Math.max(-1, Math.min(1, g[i]));
+m[i] = b1*m[i]+(1-b1)*gi; v[i] = b2*v[i]+(1-b2)*gi*gi;
+p[i] -= lr*(m[i]/bc1)/(Math.sqrt(v[i]/bc2)+eps);
+}
+}
+
+function runEpoch(model, iterX, triIds, targets, useFixed, train) {
+const N = targets.length, Vw = model.Vw, sc = Math.sqrt(DIM);
+const stride = Math.max(1, Math.floor(CTX / 2));
+let totalLoss = 0, nb = 0;
+const gE=train?new Float64Array(model.E.length):null;
+const gWq=train?new Float64Array(DIM*DIM):null, gWk=train?new Float64Array(DIM*DIM):null;
+const gWv=train?new Float64Array(DIM*DIM):null, gWo=train?new Float64Array(DIM*DIM):null;
+const gW1=train?new Float64Array(DIM*MLP_H):null, gb1=train?new Float64Array(MLP_H):null;
+const gW2=train?new Float64Array(MLP_H*DIM):null, gb2=train?new Float64Array(DIM):null;
+const gWp=train?new Float64Array(DIM*Vw):null;
+
+for (let start = 0; start + CTX < N; start += stride) {
+const X = new Float64Array(CTX * DIM);
+for (let i = 0; i < CTX; i++) {
+const si = start + i;
+if (useFixed) { X[i*DIM]=iterX[si][0]; X[i*DIM+1]=iterX[si][1]; X[i*DIM+2]=iterX[si][2]; }
+else { const id=triIds[si]; X[i*DIM]=model.E[id*DIM]; X[i*DIM+1]=model.E[id*DIM+1]; X[i*DIM+2]=model.E[id*DIM+2]; }
+}
+const Q=new Float64Array(CTX*DIM), K=new Float64Array(CTX*DIM), V=new Float64Array(CTX*DIM);
+for (let i=0;i<CTX;i++) for (let d=0;d<DIM;d++) {
+let q=0,k=0,v=0;
+for (let d2=0;d2<DIM;d2++) { q+=X[i*DIM+d2]*model.Wq[d2*DIM+d]; k+=X[i*DIM+d2]*model.Wk[d2*DIM+d]; v+=X[i*DIM+d2]*model.Wv[d2*DIM+d]; }
+Q[i*DIM+d]=q; K[i*DIM+d]=k; V[i*DIM+d]=v;
+}
+const S=new Float64Array(CTX*CTX), A=new Float64Array(CTX*CTX);
+for (let i=0;i<CTX;i++) {
+for (let j=0;j<CTX;j++) { if (j>i){S[i*CTX+j]=-1e9;continue;} let s=0; for(let d=0;d<DIM;d++) s+=Q[i*DIM+d]*K[j*DIM+d]; S[i*CTX+j]=s/sc; }
+const row=smx(S.subarray(i*CTX,(i+1)*CTX),CTX); for(let j=0;j<CTX;j++) A[i*CTX+j]=row[j];
+}
+const ctx=new Float64Array(CTX*DIM), h=new Float64Array(CTX*DIM);
+const h1=new Float64Array(CTX*MLP_H), h2=new Float64Array(CTX*DIM);
+for (let i=0;i<CTX;i++) {
+for(let d=0;d<DIM;d++){let s=0;for(let j=0;j<CTX;j++) s+=A[i*CTX+j]*V[j*DIM+d];ctx[i*DIM+d]=s;}
+for(let d=0;d<DIM;d++){let s=0;for(let d2=0;d2<DIM;d2++) s+=ctx[i*DIM+d2]*model.Wo[d2*DIM+d];h[i*DIM+d]=s+X[i*DIM+d];}
+for(let j=0;j<MLP_H;j++){let s=model.b1[j];for(let d=0;d<DIM;d++) s+=h[i*DIM+d]*model.W1[d*MLP_H+j];h1[i*MLP_H+j]=Math.max(0,s);}
+for(let d=0;d<DIM;d++){let s=model.b2[d];for(let j=0;j<MLP_H;j++) s+=h1[i*MLP_H+j]*model.W2[j*DIM+d];h2[i*DIM+d]=s+h[i*DIM+d];}
+}
+const tgt=targets.slice(start,start+CTX);
+const probs=[]; let bLoss=0;
+for(let i=0;i<CTX;i++){
+const lg=new Float64Array(Vw);
+for(let v=0;v<Vw;v++){let s=0;for(let d=0;d<DIM;d++) s+=h2[i*DIM+d]*model.Wp[d*Vw+v];lg[v]=s;}
+const p=smx(lg,Vw);probs.push(p);bLoss-=Math.log(p[tgt[i]]+1e-10);
+}
+totalLoss+=bLoss/CTX;nb++;
+if(!train)continue;
+const dh2=new Float64Array(CTX*DIM);
+for(let i=0;i<CTX;i++){const p=probs[i];for(let v=0;v<Vw;v++){const dl=(p[v]-(v===tgt[i]?1:0))/CTX;for(let d=0;d<DIM;d++){gWp[d*Vw+v]+=h2[i*DIM+d]*dl;dh2[i*DIM+d]+=model.Wp[d*Vw+v]*dl;}}}
+const dh=new Float64Array(CTX*DIM);
+for(let i=0;i<CTX;i++){
+for(let d=0;d<DIM;d++) dh[i*DIM+d]+=dh2[i*DIM+d];
+const dh1i=new Float64Array(MLP_H);
+for(let j=0;j<MLP_H;j++){let s=0;for(let d=0;d<DIM;d++){gW2[j*DIM+d]+=h1[i*MLP_H+j]*dh2[i*DIM+d];s+=model.W2[j*DIM+d]*dh2[i*DIM+d];}dh1i[j]=s;}
+for(let d=0;d<DIM;d++) gb2[d]+=dh2[i*DIM+d];
+for(let j=0;j<MLP_H;j++){const dz=dh1i[j]*(h1[i*MLP_H+j]>0?1:0);gb1[j]+=dz;for(let d=0;d<DIM;d++){gW1[d*MLP_H+j]+=h[i*DIM+d]*dz;dh[i*DIM+d]+=model.W1[d*MLP_H+j]*dz;}}
+}
+const dctx=new Float64Array(CTX*DIM),dX=new Float64Array(CTX*DIM);
+for(let i=0;i<CTX;i++){
+for(let d=0;d<DIM;d++) dX[i*DIM+d]+=dh[i*DIM+d];
+for(let d2=0;d2<DIM;d2++) for(let d=0;d<DIM;d++){gWo[d2*DIM+d]+=ctx[i*DIM+d2]*dh[i*DIM+d];dctx[i*DIM+d2]+=model.Wo[d2*DIM+d]*dh[i*DIM+d];}
+}
+const dV=new Float64Array(CTX*DIM),dA=new Float64Array(CTX*CTX);
+for(let i=0;i<CTX;i++) for(let j=0;j<CTX;j++) for(let d=0;d<DIM;d++){dA[i*CTX+j]+=dctx[i*DIM+d]*V[j*DIM+d];dV[j*DIM+d]+=A[i*CTX+j]*dctx[i*DIM+d];}
+const dQ=new Float64Array(CTX*DIM),dK=new Float64Array(CTX*DIM);
+for(let i=0;i<CTX;i++){
+let dot=0;for(let j=0;j<CTX;j++) dot+=A[i*CTX+j]*dA[i*CTX+j];
+for(let j=0;j<CTX;j++){const ds=A[i*CTX+j]*(dA[i*CTX+j]-dot)/sc;for(let d=0;d<DIM;d++){dQ[i*DIM+d]+=ds*K[j*DIM+d];dK[j*DIM+d]+=ds*Q[i*DIM+d];}}
+}
+for(let i=0;i<CTX;i++) for(let d2=0;d2<DIM;d2++) for(let d=0;d<DIM;d++){
+gWq[d2*DIM+d]+=X[i*DIM+d2]*dQ[i*DIM+d];
+gWk[d2*DIM+d]+=X[i*DIM+d2]*dK[i*DIM+d];
+gWv[d2*DIM+d]+=X[i*DIM+d2]*dV[i*DIM+d];
+dX[i*DIM+d2]+=model.Wq[d2*DIM+d]*dQ[i*DIM+d]+model.Wk[d2*DIM+d]*dK[i*DIM+d]+model.Wv[d2*DIM+d]*dV[i*DIM+d];
+}
+if(!useFixed) for(let i=0;i<CTX;i++){const id=triIds[start+i];for(let d=0;d<DIM;d++) gE[id*DIM+d]+=dX[i*DIM+d];}
+}
+
+if(train){
+model.t++;
+adam(model.Wp,gWp,model.mWp,model.vWp,model.t,LR);
+adam(model.Wq,gWq,model.mWq,model.vWq,model.t,LR);
+adam(model.Wk,gWk,model.mWk,model.vWk,model.t,LR);
+adam(model.Wv,gWv,model.mWv,model.vWv,model.t,LR);
+adam(model.Wo,gWo,model.mWo,model.vWo,model.t,LR);
+adam(model.W1,gW1,model.mW1,model.vW1,model.t,LR);
+adam(model.b1,gb1,model.mb1,model.vb1,model.t,LR);
+adam(model.W2,gW2,model.mW2,model.vW2,model.t,LR);
+adam(model.b2,gb2,model.mb2,model.vb2,model.t,LR);
+if(!useFixed) adam(model.E,gE,model.mE,model.vE,model.t,LR);
+}
+return totalLoss/Math.max(nb,1);
+}
+
+// ── Colours ───────────────────────────────────────────────────────
+const C_ITER=’#e53935’, C_RAW=’#1e88e5’, C_RAND=’#43a047’;
+
+export default function App() {
+const [status,  setStatus]  = useState(‘idle’);
+const [curves,  setCurves]  = useState({});
+const [finals,  setFinals]  = useState(null);
+const [epoch,   setEpoch]   = useState(0);
+const [log,     setLog]     = useState([]);
+const [copied,  setCopied]  = useState(false);
+const [info,    setInfo]    = useState(null);
+const running = useRef(false);
+const fullLog = useRef([]);
+
+const addLog = msg => { fullLog.current.push(msg); setLog(p => […p.slice(-120), msg]); };
+const copyResults = () => navigator.clipboard.writeText(fullLog.current.join(’\n’))
+.then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+
+const run = useCallback(async () => {
+if (running.current) return;
+running.current = true; setStatus(‘running’);
+setCurves({}); setFinals(null); setEpoch(0); setLog([]); fullLog.current = [];
+
+```
+const trData = buildData(GEN_1_10);
+const teData = buildData(ALICE_CH1);
+
+const wordVocab = [...new Set(trData.words)].sort();
+const w2i = Object.fromEntries(wordVocab.map((w, i) => [w, i]));
+const Vw = wordVocab.length;
+const logVw = Math.log(Vw);
+const triVocab = [...new Set(trData.triplets)].sort();
+const t2i = Object.fromEntries(triVocab.map((t, i) => [t, i]));
+const Vt = triVocab.length;
+
+const trTriIds = trData.triplets.map(t => t2i[t] ?? 0);
+const teTriIds = teData.triplets.map(t => t2i[t] ?? 0);
+const trTgts = trData.targets.map(i => w2i[trData.words[Math.min(i, trData.words.length-1)]] ?? 0);
+const teTgts = teData.targets.map(i => w2i[teData.words[Math.min(i, teData.words.length-1)]] ?? 0);
+
+resetRng(99);
+const randTr = trData.iterX.map(() => [randn()*0.5, randn()*0.5, randn()*0.5]);
+const randTe = teData.iterX.map(() => [randn()*0.5, randn()*0.5, randn()*0.5]);
+
+setInfo({ trN: trData.N, teN: teData.N, Vw, Vt });
+
+addLog(`Genesis→Alice Cross-Domain Test · D=3 Low-Res Triplet · ${EPOCHS} EPOCHS`);
+addLog(`Train: Genesis Ch.1–10 (${trData.N} triplets)  ·  Test: Alice Ch.I (${teData.N} triplets)`);
+addLog(`C: avg quad [b0,b1] + scalar D* digest  D=3 fixed`);
+addLog(`A: raw triplet tokens  D=3 learned embedding  Vt=${Vt}`);
+addLog(`R: random D=3 noise  fixed (control)`);
+addLog(`Vw=${Vw}  random=log(${Vw})=${logVw.toFixed(4)}  lr=${LR}  CTX=${CTX}`);
+addLog(`─────────────────────────────────────────────────`);
+
+resetRng(42); const mC = buildModel(Vw, Vt);
+resetRng(42); const mA = buildModel(Vw, Vt);
+resetRng(42); const mR = buildModel(Vw, Vt);
+
+const trC=[],trA=[],trR=[],teC=[],teA=[],teR=[];
+
+for (let ep = 0; ep < EPOCHS; ep++) {
+  if (!running.current) break;
+  const ltrC = runEpoch(mC, trData.iterX, trTriIds, trTgts, true,  true);
+  const ltrA = runEpoch(mA, null,         trTriIds, trTgts, false, true);
+  const ltrR = runEpoch(mR, randTr,       trTriIds, trTgts, true,  true);
+  const lteC = runEpoch(mC, teData.iterX, teTriIds, teTgts, true,  false);
+  const lteA = runEpoch(mA, null,         teTriIds, teTgts, false, false);
+  const lteR = runEpoch(mR, randTe,       teTriIds, teTgts, true,  false);
+
+  trC.push(ltrC);trA.push(ltrA);trR.push(ltrR);
+  teC.push(lteC);teA.push(lteA);teR.push(lteR);
+  setCurves({trC:[...trC],trA:[...trA],trR:[...trR],teC:[...teC],teA:[...teA],teR:[...teR]});
+  setEpoch(ep+1);
+  setFinals({trC:ltrC,trA:ltrA,trR:ltrR,teC:lteC,teA:lteA,teR:lteR,
+             gapC:lteC-ltrC,gapA:lteA-ltrA,gapR:lteR-ltrR,logVw});
+  const m=(ep+1)%10===0;
+  addLog(`Ep${String(ep+1).padStart(3)}  tr C=${ltrC.toFixed(3)} A=${ltrA.toFixed(3)} R=${ltrR.toFixed(3)}  te C=${lteC.toFixed(3)} A=${lteA.toFixed(3)} R=${lteR.toFixed(3)}${m?' ◆':''}`);
+  if(m) addLog(`       gap C=${(lteC-ltrC).toFixed(3)} A=${(lteA-ltrA).toFixed(3)} R=${(lteR-ltrR).toFixed(3)}`);
+  await new Promise(r => setTimeout(r, 0));
+}
+addLog(`─────────────────────────────────────────────────`);
+addLog(`FINAL TRAIN  C=${trC.at(-1).toFixed(4)}  A=${trA.at(-1).toFixed(4)}  R=${trR.at(-1).toFixed(4)}`);
+addLog(`FINAL TEST   C=${teC.at(-1).toFixed(4)}  A=${teA.at(-1).toFixed(4)}  R=${teR.at(-1).toFixed(4)}`);
+addLog(`GAP(te-tr)   C=${(teC.at(-1)-trC.at(-1)).toFixed(4)}  A=${(teA.at(-1)-trA.at(-1)).toFixed(4)}  R=${(teR.at(-1)-trR.at(-1)).toFixed(4)}`);
+addLog(`C gap<0 → generalises  ·  A gap>0 → overfits`);
+running.current = false; setStatus('done');
+```
+
+}, []);
+
+// ── Chart ─────────────────────────────────────────────────────
+const globalMinMax = () => {
+const all=[
+…(curves.trC||[]),…(curves.teC||[]),
+…(curves.trA||[]),…(curves.teA||[]),
+…(curves.trR||[]),…(curves.teR||[]),
+];
+if(!all.length) return {minL:0,maxL:8};
+return { minL:0, maxL:Math.max(Math.max(…all)*1.12, 8) };
+};
+
+const renderChart = (trainMode) => {
+const keys = trainMode
+? {C:curves.trC,A:curves.trA,R:curves.trR}
+: {C:curves.teC,A:curves.teA,R:curves.teR};
+if(!keys.C?.length) return null;
+const W=320,H=280,PL=42,PR=12,PT=16,PB=36;
+const cW=W-PL-PR,cH=H-PT-PB;
+const {minL,maxL}=globalMinMax();
+const n=keys.C.length;
+const xS=i=>PL+(i/Math.max(n-1,1))*cW;
+const yS=v=>PT+(1-(v-minL)/(maxL-minL+1e-9))*cH;
+const path=(data,color)=>{
+if(!data?.length) return null;
+const d=data.map((v,i)=>`${i===0?'M':'L'}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(’ ’);
+return <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"/>;
+};
+const logVw=finals?.logVw||Math.log(500);
+const yTicks=[0,1,2,3,4,5,6,7,8].filter(v=>v<=maxL+0.1).map(v=>{
+const y=yS(v);
+return <g key={v}>
+<line x1={PL} y1={y} x2={PL+cW} y2={y} stroke="#efefef"/>
+<text x={PL-4} y={y+4} textAnchor="end" fontSize="8" fill="#c0c8d0" fontFamily="system-ui">{v}</text>
+</g>;
+});
+const xTicks=[20,40,60,80,100].map(e=>e<=n?<g key={e}>
+<line x1={xS(e-1)} y1={PT} x2={xS(e-1)} y2={PT+cH} stroke="#f3f3f3"/>
+<text x={xS(e-1)} y={PT+cH+14} textAnchor="middle" fontSize="8" fill="#c0c8d0" fontFamily="system-ui">{e}</text>
+</g>:null);
+return (
+<svg width={W} height={H} style={{display:‘block’,width:‘100%’,height:‘auto’}}>
+<rect width={W} height={H} fill="white"/>
+<line x1={PL} y1={yS(logVw)} x2={PL+cW} y2={yS(logVw)} stroke="#e0e0e0" strokeDasharray="4,4"/>
+<text x={PL+cW-2} y={yS(logVw)-4} textAnchor="end" fontSize="8" fill="#d0d0d0" fontFamily="system-ui">random</text>
+{yTicks}{xTicks}
+<line x1={PL} y1={PT} x2={PL} y2={PT+cH} stroke="#e8e8e8"/>
+<line x1={PL} y1={PT+cH} x2={PL+cW} y2={PT+cH} stroke="#e8e8e8"/>
+<text x={12} y={PT+cH/2} textAnchor=“middle” fontSize=“8” fill=”#c8d0d8” fontFamily=“system-ui” transform={`rotate(-90,12,${PT+cH/2})`}>Loss</text>
+<text x={PL+cW/2} y={H-2} textAnchor="middle" fontSize="8" fill="#c8d0d8" fontFamily="system-ui">Epoch</text>
+{path(keys.R,C_RAND)}{path(keys.A,C_RAW)}{path(keys.C,C_ITER)}
+{[‘C’,‘A’,‘R’].map(k=>{
+const data=keys[k];const color={C:C_ITER,A:C_RAW,R:C_RAND}[k];
+if(!data?.length) return null;
+const v=data.at(-1);
+return <g key={k}>
+<circle cx={xS(data.length-1)} cy={yS(v)} r="3" fill={color}/>
+<text x={xS(data.length-1)+5} y={yS(v)+4} fontSize="9" fill={color} fontFamily="system-ui" fontWeight="600">{v.toFixed(2)}</text>
+</g>;
+})}
+</svg>
+);
+};
+
+const mono=”‘JetBrains Mono’,‘Fira Code’,monospace”;
+const sans=“system-ui,-apple-system,sans-serif”;
+const t2=’#8a9aaa’, t3=’#b0bcc8’;
+
+return (
+<div style={{background:’#f7f8fa’,minHeight:‘100vh’,padding:‘20px 14px’,fontFamily:sans}}>
+<div style={{maxWidth:600,margin:‘0 auto’,background:‘white’,borderRadius:14,padding:‘20px 20px 18px’,boxShadow:‘0 1px 18px rgba(0,0,0,0.07)’}}>
+
+```
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:9,color:t3,letterSpacing:'0.22em',textTransform:'uppercase',marginBottom:5}}>
+        Quadratic Iterator · Low-Res Triplet · Genesis Ch.1–10 → Ch.11–20
+      </div>
+      <div style={{fontSize:20,fontWeight:700,color:'#222',letterSpacing:'-0.01em',marginBottom:12}}>
+        Iterator D=3 Low-Res · Genesis
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr',gap:7,marginBottom:10}}>
+        {[
+          {label:'ITERATOR  C', color:C_ITER, bg:'#fff5f5', border:'#fcc',
+           lines:['D=3  [mean_b0, mean_b1, D*_digest]','quad averaged over 24 bits/triplet  ·  digest sparse at word boundary','fixed input  ·  no learned embedding']},
+          {label:'RAW TRIPLETS  A', color:C_RAW, bg:'#f4f8ff', border:'#c0d8f8',
+           lines:['D=3  learned embedding  Vt=triplet vocab','3-char windows  ·  standard baseline','embedding trained end-to-end']},
+          {label:'RANDOM  R', color:C_RAND, bg:'#f4fff5', border:'#b2dfdb',
+           lines:['D=3  Gaussian noise  fixed input','control  ·  fixed-input regime is not the advantage']},
+        ].map(({label,color,bg,border,lines})=>(
+          <div key={label} style={{background:bg,border:`1.5px solid ${border}`,borderRadius:8,padding:'7px 12px',display:'flex',alignItems:'center',gap:12}}>
+            <div style={{fontSize:9,fontWeight:700,color,letterSpacing:'0.08em',whiteSpace:'nowrap',minWidth:104,fontFamily:sans}}>{label}</div>
+            <div style={{flex:1,borderLeft:`1px solid ${border}`,paddingLeft:12}}>
+              {lines.map((l,i)=>(
+                <div key={i} style={{fontSize:10,color:t2,fontFamily:mono,lineHeight:1.65}}>{l}</div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {info && <div style={{fontSize:10,color:t3,fontFamily:mono}}>
+        train {info.trN} triplets · test {info.teN} triplets · Vw={info.Vw} · CTX={CTX} · D=3 · 128×2 MLP · lr={LR}
+      </div>}
+    </div>
+
+    <div style={{display:'flex',gap:14,fontSize:11,color:t2,marginBottom:8,flexWrap:'wrap',alignItems:'center'}}>
+      {[{color:C_ITER,label:'Iterator (C)'},{color:C_RAW,label:'Raw triplets (A)'},{color:C_RAND,label:'Random (R)'}]
+        .map(({color,label})=>(
+          <span key={label} style={{display:'flex',alignItems:'center',gap:5}}>
+            <svg width="22" height="10"><line x1="0" y1="5" x2="22" y2="5" stroke={color} strokeWidth="2.5"/></svg>
+            {label}
+          </span>
+        ))}
+      {epoch>0 && <span style={{marginLeft:'auto',color:t3,fontSize:10,fontFamily:mono}}>ep {epoch}/{EPOCHS}</span>}
+    </div>
+
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+      {[['Training · Genesis Ch.1–10',true],['Test · Alice Ch.I',false]].map(([title,tm])=>(
+        <div key={title} style={{borderRadius:8,border:'1px solid #eef0f3',overflow:'hidden'}}>
+          <div style={{fontSize:10,fontWeight:600,color:t2,padding:'6px 10px 0',fontFamily:sans}}>{title}</div>
+          {renderChart(tm)||(
+            <div style={{height:280,display:'flex',alignItems:'center',justifyContent:'center',color:t3,fontSize:11}}>Press Run</div>
+          )}
+        </div>
+      ))}
+    </div>
+
+    {finals && (
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
+        {[
+          {label:'Iterator C',gap:finals.gapC},
+          {label:'Raw A',     gap:finals.gapA},
+          {label:'Random R',  gap:finals.gapR},
+        ].map(({label,gap})=>{
+          const neg=gap<0;
+          return (
+            <div key={label} style={{background:neg?'#f0fff4':'#fff8f0',border:`1px solid ${neg?'#a5d6a7':'#ffcc80'}`,borderRadius:8,padding:'8px 10px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:t3,marginBottom:2,fontFamily:sans}}>{label} · gap</div>
+              <div style={{fontSize:18,fontWeight:700,color:neg?'#43a047':'#ef6c00',fontFamily:sans,lineHeight:1.2}}>{gap>=0?'+':''}{gap.toFixed(4)}</div>
+              <div style={{fontSize:9,color:t3,marginTop:2,fontFamily:sans}}>{neg?'generalises':'overfits'}</div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {finals && (
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
+        {[
+          {label:'Iterator C',trL:finals.trC,teL:finals.teC,color:C_ITER,bg:'#fff5f5'},
+          {label:'Raw A',     trL:finals.trA,teL:finals.teA,color:C_RAW, bg:'#f4f8ff'},
+          {label:'Random R',  trL:finals.trR,teL:finals.teR,color:C_RAND,bg:'#f4fff5'},
+        ].map(({label,trL,teL,color,bg})=>(
+          <div key={label} style={{background:bg,borderRadius:8,padding:'8px 10px'}}>
+            <div style={{fontSize:10,color,fontWeight:600,marginBottom:4,fontFamily:sans}}>{label}</div>
+            <div style={{fontSize:10,color:t2,fontFamily:mono,lineHeight:1.9}}>
+              train {trL.toFixed(4)}<br/>test &nbsp;{teL.toFixed(4)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+      <button onClick={run} disabled={status==='running'} style={{
+        background:status==='running'?'#f5f5f5':'#222',color:status==='running'?'#bbb':'white',
+        border:'none',borderRadius:7,padding:'9px 22px',fontFamily:sans,fontSize:12,cursor:status==='running'?'default':'pointer',
+      }}>
+        {status==='idle'?'Run':status==='running'?'Running…':'Run Again'}
+      </button>
+      {status==='running'&&<button onClick={()=>{running.current=false;}} style={{
+        background:'white',border:'1px solid #e0e0e0',color:t2,borderRadius:7,padding:'9px 18px',fontFamily:sans,fontSize:12,cursor:'pointer'
+      }}>Stop</button>}
+      {log.length>0&&<button onClick={copyResults} style={{
+        background:copied?'#f0fff4':'white',border:`1px solid ${copied?'#4caf50':'#e0e0e0'}`,
+        color:copied?'#4caf50':t2,borderRadius:7,padding:'9px 18px',fontFamily:sans,fontSize:12,cursor:'pointer',marginLeft:'auto'
+      }}>{copied?'✓ Copied':'Copy Log'}</button>}
+    </div>
+
+    {log.length>0&&(
+      <div style={{background:'#fafafa',border:'1px solid #eee',borderRadius:8,padding:'10px 12px',maxHeight:260,overflowY:'auto',fontFamily:mono,fontSize:10.5,lineHeight:1.9}}>
+        {log.map((l,i)=>{
+          const fin=l.startsWith('FINAL')||l.startsWith('GAP')||l.startsWith('C gap');
+          const mil=l.includes('◆');
+          const sep=l.startsWith('─');
+          return <div key={i} style={{color:fin?'#334':sep?'#e0e0e0':mil?'#5a6a7a':t3,fontWeight:fin||mil?600:400}}>{l}</div>;
+        })}
+      </div>
+    )}
+
+    <div style={{marginTop:12,fontSize:9,color:'#ddd',textAlign:'right',fontFamily:sans}}>
+      Phillip Somerville · @unitambo · 2026
+    </div>
+  </div>
+</div>
+```
+
+);
+}
