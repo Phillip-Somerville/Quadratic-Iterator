@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Iterator · Word-Level Digest</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #f2f2f7;
+    font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+    padding: 20px 14px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+  }
+  .header { padding: 24px 24px 18px; border-bottom: 1px solid #f0f0f5; }
+  .eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #aeaeb2; margin-bottom: 7px; }
+  .title { font-size: 21px; font-weight: 700; color: #1c1c1e; letter-spacing: -0.02em; margin-bottom: 5px; }
+  .subtitle { font-size: 12px; color: #8e8e93; line-height: 1.6; margin-bottom: 12px; }
+  .pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .pill { background: #f2f2f7; border-radius: 20px; padding: 3px 9px; font-size: 10px; color: #6e6e73; font-weight: 500; }
+  .section { padding: 16px 24px; border-bottom: 1px solid #f0f0f5; }
+  .section:last-child { border-bottom: none; }
+  .section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #aeaeb2; margin-bottom: 10px; }
+
+/* Token diagram */
+.token-row { display: flex; gap: 2px; margin-bottom: 8px; align-items: center; }
+.token-dim {
+height: 28px; border-radius: 4px; display: flex; align-items: center;
+justify-content: center; font-size: 8px; font-weight: 600; color: white;
+flex-shrink: 0;
+}
+.dim-char { background: #1c1c1e; }
+.dim-digest { background: #e53935; }
+.dim-zero { background: #e5e5ea; }
+.token-label { font-size: 10px; color: #8e8e93; margin-left: 8px; white-space: nowrap; }
+
+/* Status */
+.status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.idle { background: #aeaeb2; }
+.status-dot.init { background: #ff9500; animation: pulse 1s infinite; }
+.status-dot.running { background: #34c759; animation: pulse 0.6s infinite; }
+.status-dot.done { background: #34c759; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.status-text { font-size: 12px; color: #3a3a3c; font-weight: 500; }
+.epoch-text { font-size: 11px; color: #aeaeb2; margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* Charts */
+.chart-wrap { border: 1px solid #f0f0f5; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+.chart-header { padding: 8px 12px 4px; font-size: 10px; font-weight: 600; color: #8e8e93; }
+svg { display: block; width: 100%; height: auto; }
+
+/* Result cards */
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.result-card { border-radius: 12px; padding: 12px 14px; }
+.result-card.train { background: #f2f2f7; }
+.result-card.test  { background: #fff5f5; }
+.result-label { font-size: 10px; color: #aeaeb2; margin-bottom: 4px; font-weight: 500; }
+.result-loss { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; margin-bottom: 2px; }
+.result-signal { font-size: 11px; color: #8e8e93; }
+.result-gap { font-size: 11px; font-weight: 600; margin-top: 2px; }
+
+/* Controls */
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+button.primary {
+background: #1c1c1e; color: white; border: none;
+border-radius: 10px; padding: 11px 24px;
+font-family: inherit; font-size: 12px; font-weight: 600;
+cursor: pointer; min-width: 120px;
+}
+button.primary:disabled { background: #f2f2f7; color: #aeaeb2; cursor: default; }
+button.secondary {
+background: white; border: 1px solid #e5e5ea; color: #6e6e73;
+border-radius: 10px; padding: 11px 18px;
+font-family: inherit; font-size: 12px; cursor: pointer;
+}
+button.secondary:disabled { color: #d1d1d6; border-color: #f2f2f7; cursor: default; }
+
+/* Log */
+.log-box {
+background: #f9f9fb; border: 1px solid #f0f0f5; border-radius: 12px;
+padding: 10px 12px; max-height: 200px; overflow-y: auto;
+font-family: ‘SF Mono’, ‘Fira Code’, monospace;
+font-size: 10px; line-height: 1.9; margin-top: 10px;
+}
+.log-line { color: #aeaeb2; }
+.log-line.hi { color: #1c1c1e; font-weight: 600; }
+.log-line.sep { color: #e5e5ea; }
+.log-line.info { color: #e53935; }
+
+.footer { padding: 14px 24px; background: #f9f9fb; border-top: 1px solid #f0f0f5; display: flex; justify-content: space-between; }
+.footer span { font-size: 11px; color: #aeaeb2; }
+</style>
+
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+
+  <div class="header">
+    <div class="eyebrow">Quadratic Iterator · Word-Level · Fixed Input</div>
+    <div class="title">Word + Digest Encoding</div>
+    <div class="subtitle">
+      One token per word · D=32 · ASCII bytes + D* digest co-resident<br>
+      Train: Genesis Ch.1–10 &nbsp;·&nbsp; Test: Alice Ch.I (cross-corpus)
+    </div>
+    <div class="pills">
+      <span class="pill">D=32</span>
+      <span class="pill">CTX=32 words</span>
+      <span class="pill">QKV(16/16)</span>
+      <span class="pill">256×2 MLP</span>
+      <span class="pill">unlearned</span>
+      <span class="pill">lr=2e-4</span>
+      <span class="pill">100 epochs</span>
+    </div>
+  </div>
+
+  <!-- Token diagram -->
+
+  <div class="section">
+    <div class="section-label">Token structure · D=32 per word</div>
+    <!-- "the" example -->
+    <div style="margin-bottom:6px;font-size:10px;color:#8e8e93">"the" (3 chars)</div>
+    <div class="token-row">
+      <div class="token-dim dim-char" style="width:24px">t</div>
+      <div class="token-dim dim-char" style="width:24px">h</div>
+      <div class="token-dim dim-char" style="width:24px">e</div>
+      <div class="token-dim dim-digest" style="width:24px">D*</div>
+      <div class="token-dim dim-zero" style="width:336px;opacity:0.4"></div>
+      <span class="token-label">28 zeros</span>
+    </div>
+    <!-- "beginning" example -->
+    <div style="margin-top:8px;margin-bottom:6px;font-size:10px;color:#8e8e93">"beginning" (9 chars)</div>
+    <div class="token-row">
+      <div class="token-dim dim-char" style="width:24px">b</div>
+      <div class="token-dim dim-char" style="width:24px">e</div>
+      <div class="token-dim dim-char" style="width:24px">g</div>
+      <div class="token-dim dim-char" style="width:24px">i</div>
+      <div class="token-dim dim-char" style="width:24px">n</div>
+      <div class="token-dim dim-char" style="width:24px">n</div>
+      <div class="token-dim dim-char" style="width:24px">i</div>
+      <div class="token-dim dim-char" style="width:24px">n</div>
+      <div class="token-dim dim-char" style="width:24px">g</div>
+      <div class="token-dim dim-digest" style="width:24px">D*</div>
+      <div class="token-dim dim-zero" style="width:264px;opacity:0.4"></div>
+      <span class="token-label">22 zeros</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:12px;font-size:10px;color:#8e8e93;align-items:center">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#1c1c1e;border-radius:2px;display:inline-block"></span>ASCII/255</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#e53935;border-radius:2px;display:inline-block"></span>D* digest</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#e5e5ea;border-radius:2px;display:inline-block"></span>zero pad</span>
+    </div>
+  </div>
+
+  <!-- Training section -->
+
+  <div class="section">
+    <div class="status-row">
+      <div class="status-dot idle" id="status-dot"></div>
+      <div class="status-text" id="status-text">Ready</div>
+      <div class="epoch-text" id="epoch-text"></div>
+    </div>
+
+```
+<!-- Loss curve -->
+<div class="chart-wrap">
+  <div class="chart-header" id="chart-title">Loss curve — press Run to begin</div>
+  <div id="chart-area" style="height:180px;display:flex;align-items:center;justify-content:center;color:#d1d1d6;font-size:11px">
+    train (solid) · test (dashed)
+  </div>
+</div>
+
+<!-- Result cards -->
+<div class="result-grid" id="result-grid" style="display:none">
+  <div class="result-card train">
+    <div class="result-label">Train · Genesis Ch.1–10</div>
+    <div class="result-loss" id="train-loss" style="color:#1c1c1e">—</div>
+    <div class="result-signal" id="train-signal"></div>
+  </div>
+  <div class="result-card test">
+    <div class="result-label">Test · Alice Ch.I</div>
+    <div class="result-loss" id="test-loss" style="color:#e53935">—</div>
+    <div class="result-signal" id="test-signal"></div>
+    <div class="result-gap" id="test-gap"></div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <button class="primary" id="btn-run">Run</button>
+  <button class="secondary" id="btn-stop" disabled>Stop</button>
+  <button class="secondary" id="btn-reset">Reset</button>
+  <button class="secondary" id="btn-copy" style="margin-left:auto">Copy Log</button>
+</div>
+
+<div class="log-box" id="log-box"></div>
+```
+
+  </div>
+
+  <div class="footer">
+    <span>Phillip Somerville · @unitambo · 2026</span>
+    <span>Word-Level Digest · v1.0 · unlearned</span>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// ITERATOR CORE
+// ═══════════════════════════════════════════════════════════
+const C_F=1.094, DELTA=0.002, PREC=14;
+function tr(x){const s=Math.pow(10,PREC);const r=Math.round(x*s)/s;return r>=0?Math.floor(r*s)/s:Math.ceil(r*s)/s;}
+function textBits(s){const bits=[];for(const ch of s.toLowerCase()){const c=ch.charCodeAt(0);for(let i=7;i>=0;i--)bits.push((c>>i)&1);}return bits;}
+function encodeF(bits){return bits.concat([0,0]).map(b=>C_F+(b?DELTA:0));}
+function dStar(word,seed=0.085){
+  const bits=textBits(word);
+  let s=seed,prev=-999;
+  for(let it=0;it<20;it++){
+    const FSeq=encodeF(bits);let h=tr(s);
+    for(const F of FSeq)h=tr((h*h-F)*(h*h-F)-F);
+    if(Math.abs(h-prev)<1e-15)return h;
+    prev=h;s=h;
+  }
+  return prev;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOKEN ENCODING  D=32 per word
+// ═══════════════════════════════════════════════════════════
+const DIM=32;
+function wordToVec(word){
+  const v=new Float32Array(DIM);
+  const s=word.toLowerCase();
+  for(let i=0;i<Math.min(s.length,DIM-1);i++)v[i]=s.charCodeAt(i)/255.0;
+  const digestSlot=Math.min(s.length,DIM-1);
+  v[digestSlot]=dStar(word);
+  return v;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORPUS
+// ═══════════════════════════════════════════════════════════
+const GENESIS=`in the beginning god created the heaven and the earth and the earth was without form and void and darkness was upon the face of the deep and the spirit of god moved upon the face of the waters and god said let there be light and there was light and god saw the light that it was good and god divided the light from the darkness and god called the light day and the darkness he called night and the evening and the morning were the first day and god said let there be a firmament in the midst of the waters and let it divide the waters from the waters and god made the firmament and divided the waters which were under the firmament from the waters which were above the firmament and it was so and god called the firmament heaven and the evening and the morning were the second day and god said let the waters under the heaven be gathered together unto one place and let the dry land appear and it was so and god called the dry land earth and the gathering together of the waters called he seas and god saw that it was good and god said let the earth bring forth grass the herb yielding seed and the fruit tree yielding fruit after his kind whose seed is in itself upon the earth and it was so and the earth brought forth grass and herb yielding seed after his kind and the tree yielding fruit whose seed was in itself after his kind and god saw that it was good and the evening and the morning were the third day and god said let there be lights in the firmament of the heaven to divide the day from the night and let them be for signs and for seasons and for days and years and let them be for lights in the firmament of the heaven to give light upon the earth and it was so and god made two great lights the greater light to rule the day and the lesser light to rule the night he made the stars also and god set them in the firmament of the heaven to give light upon the earth and to rule over the day and over the night and to divide the light from the darkness and god saw that it was good and the evening and the morning were the fourth day and god said let the waters bring forth abundantly the moving creature that hath life and fowl that may fly above the earth in the open firmament of heaven and god created great whales and every living creature that moveth which the waters brought forth abundantly after their kind and every winged fowl after his kind and god saw that it was good and god blessed them saying be fruitful and multiply and fill the waters in the seas and let fowl multiply in the earth and the evening and the morning were the fifth day and god said let the earth bring forth the living creature after his kind cattle and creeping thing and beast of the earth after his kind and it was so and god made the beast of the earth after his kind and cattle after their kind and every thing that creepeth upon the earth after his kind and god saw that it was good and god said let us make man in our image after our likeness and let them have dominion over the fish of the sea and over the fowl of the air and over the cattle and over all the earth and over every creeping thing that creepeth upon the earth so god created man in his own image in the image of god created he him male and female created he them and god blessed them and god said unto them be fruitful and multiply and replenish the earth and subdue it and have dominion over the fish of the sea and over the fowl of the air and over every living thing that moveth upon the earth and god said behold i have given you every herb bearing seed which is upon the face of all the earth and every tree in the which is the fruit of a tree yielding seed to you it shall be for meat and to every beast of the earth and to every fowl of the air and to every thing that creepeth upon the earth wherein there is life i have given every green herb for meat and it was so and god saw every thing that he had made and behold it was very good and the evening and the morning were the sixth day thus the heavens and the earth were finished and all the host of them and on the seventh day god ended his work which he had made and he rested on the seventh day from all his work which he had made and god blessed the seventh day and sanctified it because that in it he had rested from all his work which god created and made the lord god formed man of the dust of the ground and breathed into his nostrils the breath of life and man became a living soul and the lord god planted a garden eastward in eden and there he put the man whom he had formed and the lord god commanded the man saying of every tree of the garden thou mayest freely eat but of the tree of the knowledge of good and evil thou shalt not eat of it for in the day that thou eatest thereof thou shalt surely die and the lord god said it is not good that the man should be alone i will make him an help meet for him and the lord god caused a deep sleep to fall upon adam and he slept and he took one of his ribs and closed up the flesh instead thereof and the rib which the lord god had taken from man made he a woman and brought her unto the man and adam said this is now bone of my bones and flesh of my flesh she shall be called woman because she was taken out of man now the serpent was more subtil than any beast of the field which the lord god had made and he said unto the woman yea hath god said ye shall not eat of every tree of the garden and the woman said unto the serpent we may eat of the fruit of the trees of the garden but of the fruit of the tree which is in the midst of the garden god hath said ye shall not eat of it neither shall ye touch it lest ye die and the serpent said unto the woman ye shall not surely die for god doth know that in the day ye eat thereof then your eyes shall be opened and ye shall be as gods knowing good and evil and when the woman saw that the tree was good for food and that it was pleasant to the eyes and a tree to be desired to make one wise she took of the fruit thereof and did eat and gave also unto her husband with her and he did eat and the lord god said unto the serpent because thou hast done this thou art cursed above all cattle and above every beast of the field upon thy belly shalt thou go and dust shalt thou eat all the days of thy life and unto adam he said because thou hast hearkened unto the voice of thy wife and hast eaten of the tree cursed is the ground for thy sake in sorrow shalt thou eat of it all the days of thy life and adam knew eve his wife and she conceived and bare cain and she again bare his brother abel and abel was a keeper of sheep but cain was a tiller of the ground and the lord had respect unto abel and to his offering but unto cain and to his offering he had not respect and cain was very wroth and the lord said unto cain why art thou wroth if thou doest well shalt thou not be accepted and if thou doest not well sin lieth at the door and cain talked with abel his brother and it came to pass when they were in the field that cain rose up against abel his brother and slew him and the lord said unto cain where is abel thy brother and he said i know not am i my brother keeper and noah was five hundred years old and noah begat shem ham and japheth and god saw that the wickedness of man was great in the earth and that every imagination of the thoughts of his heart was only evil continually and it repented the lord that he had made man on the earth and it grieved him at his heart and the lord said i will destroy man whom i have created from the face of the earth but noah found grace in the eyes of the lord noah was a just man and perfect in his generations and noah walked with god and god said unto noah the end of all flesh is come before me make thee an ark of gopher wood and noah did according unto all that the lord commanded him and the flood was forty days upon the earth and the waters increased and bare up the ark and the waters prevailed exceedingly upon the earth and all the high hills that were under the whole heaven were covered and all flesh died that moved upon the earth and noah only remained alive and they that were with him in the ark and god remembered noah and every living thing and god made a wind to pass over the earth and the waters assuaged and the ark rested upon the mountains of ararat and noah builded an altar unto the lord and the lord smelled a sweet savour and the lord said in his heart i will not again curse the ground any more for man sake and god blessed noah and his sons and said be fruitful and multiply and replenish the earth`;
+
+const ALICE=`alice was beginning to get very tired of sitting by her sister on the bank and of having nothing to do once or twice she had peeped into the book her sister was reading but it had no pictures or conversations in it and what is the use of a book thought alice without pictures or conversations so she was considering in her own mind as well as she could for the hot day made her feel very sleepy and stupid whether the pleasure of making a daisy chain would be worth the trouble of getting up and picking the daisies when suddenly a white rabbit with pink eyes ran close by her there was nothing so very remarkable in that nor did alice think it so very much out of the way to hear the rabbit say to itself oh dear oh dear i shall be late but when the rabbit actually took a watch out of its waistcoat pocket and looked at it and then hurried on alice started to her feet for it flashed across her mind that she had never before seen a rabbit with either a waistcoat pocket or a watch to take out of it and burning with curiosity she ran across the field after it and was just in time to see it pop down a large rabbit hole under the hedge in another moment down went alice after it the rabbit hole went straight on like a tunnel for some way and then dipped suddenly down so suddenly that alice had not a moment to think about stopping herself before she found herself falling down a very deep well either the well was very deep or she fell very slowly for she had plenty of time as she went down to look about her and to wonder what was going to happen next first she tried to look down and make out what she was coming to but it was too dark to see anything then she looked at the sides of the well and noticed that they were filled with cupboards and book shelves here and there she saw maps and pictures hung upon pegs she took down a jar from one of the shelves as she passed it was labelled orange marmalade but to her great disappointment it was empty she did not like to drop the jar for fear of killing somebody underneath so managed to put it into one of the cupboards as she fell past it down down down would the fall never come to an end there was nothing else to do so alice soon began talking again dinah will miss me very much tonight i should think dinah was the cat i hope they will remember her saucer of milk at teatime dinah my dear i wish you were down here with me there are no mice in the air i am afraid but you might catch a bat and that is very like a mouse you know but do cats eat bats i wonder and here alice began to get rather sleepy and went on saying to herself in a dreamy sort of way do cats eat bats do cats eat bats and sometimes do bats eat cats for you see as she could not answer either question it did not much matter which way she put it she felt that she was dozing off and had just begun to dream that she was walking hand in hand with dinah when suddenly thump thump down she came upon a heap of sticks and dry leaves and the fall was over alice was not a bit hurt and she jumped up on to her feet in a moment she looked up but it was all dark overhead before her was another long passage and the white rabbit was still in sight hurrying down it there was not a moment to be lost away went alice like the wind and was just in time to hear it say as it turned a corner oh my ears and whiskers how late it is getting she was close behind it when she turned the corner but the rabbit was no longer to be seen she found herself in a long low hall which was lit up by a row of lamps hanging from the roof there were doors all round the hall but they were all locked and when alice had been all the way down one side and up the other trying every door she walked sadly down the middle wondering how she was ever to get out again suddenly she came upon a little table all made of solid glass there was nothing on it but a tiny golden key and alice thought it might belong to one of the doors of the hall but the locks were too large or the key was too small and it would not open any of them however on the second time round she came upon a low curtain she had not noticed before and behind it was a little door about fifteen inches high she tried the little golden key in the lock and to her great delight it fitted`;
+
+// ═══════════════════════════════════════════════════════════
+// BUILD DATA
+// ═══════════════════════════════════════════════════════════
+function buildData(text){
+  const words=text.toLowerCase().match(/[a-z']+/g)||[];
+  const X=words.map(w=>wordToVec(w));
+  return {words,X,N:words.length};
+}
+
+// ═══════════════════════════════════════════════════════════
+// RNG
+// ═══════════════════════════════════════════════════════════
+let _rng=42;
+function resetRng(s=42){_rng=s>>>0;}
+function rand(){_rng=(((_rng*1664525)>>>0)+1013904223)>>>0;return _rng/0x100000000;}
+function randn(){const u=1-rand(),v=rand();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// ═══════════════════════════════════════════════════════════
+// MODEL  CTX=32 words, QKV dim=16, MLP hidden=256
+// ═══════════════════════════════════════════════════════════
+const CTX=32,DK=16,DV=16,MLP_H=256,EPOCHS=100,LR=2e-4;
+const IN_DIM=CTX*DV;
+
+function buildAttn(){
+  const h=(r,c)=>{const w=new Float32Array(r*c);const sc=Math.sqrt(2/c);for(let i=0;i<w.length;i++)w[i]=randn()*sc;return w;};
+  return{
+    WQ:h(DK,DIM),mWQ:new Float32Array(DK*DIM),vWQ:new Float32Array(DK*DIM),
+    WK:h(DK,DIM),mWK:new Float32Array(DK*DIM),vWK:new Float32Array(DK*DIM),
+    WV:h(DV,DIM),mWV:new Float32Array(DV*DIM),vWV:new Float32Array(DV*DIM),
+    t:0,
+  };
+}
+
+function buildMLP(Vw){
+  const h=(r,c)=>{const w=new Float32Array(r*c);const sc=Math.sqrt(2/c);for(let i=0;i<w.length;i++)w[i]=randn()*sc;return w;};
+  const z=n=>new Float32Array(n);
+  return{
+    W1:h(MLP_H,IN_DIM),b1:z(MLP_H),
+    W2:h(MLP_H,MLP_H), b2:z(MLP_H),
+    W3:h(Vw,MLP_H),    b3:z(Vw),
+    mW1:z(MLP_H*IN_DIM),vW1:z(MLP_H*IN_DIM),
+    mb1:z(MLP_H),vb1:z(MLP_H),
+    mW2:z(MLP_H*MLP_H),vW2:z(MLP_H*MLP_H),
+    mb2:z(MLP_H),vb2:z(MLP_H),
+    mW3:z(Vw*MLP_H),vW3:z(Vw*MLP_H),
+    mb3:z(Vw),vb3:z(Vw),
+    t:0,Vw,
+  };
+}
+
+function smx(arr,n){
+  let mx=-Infinity;for(let i=0;i<n;i++)if(arr[i]>mx)mx=arr[i];
+  let s=0;const o=new Float32Array(n);
+  for(let i=0;i<n;i++){o[i]=Math.exp(arr[i]-mx);s+=o[i];}
+  for(let i=0;i<n;i++)o[i]/=s;
+  return o;
+}
+function relu(x){return x>0?x:0;}
+function adam(p,g,m,v,t,lr){
+  const b1=0.9,b2=0.999,eps=1e-8,bc1=1-Math.pow(b1,t),bc2=1-Math.pow(b2,t);
+  for(let i=0;i<p.length;i++){
+    const gi=Math.max(-1,Math.min(1,g[i]));
+    m[i]=b1*m[i]+(1-b1)*gi;v[i]=b2*v[i]+(1-b2)*gi*gi;
+    p[i]-=lr*(m[i]/bc1)/(Math.sqrt(v[i]/bc2)+eps);
+  }
+}
+
+function matmul(W,x,rows,cols){
+  const o=new Float32Array(rows);
+  for(let i=0;i<rows;i++){let s=0;for(let j=0;j<cols;j++)s+=W[i*cols+j]*x[j];o[i]=s;}
+  return o;
+}
+
+function attnFwd(a,seq){
+  const N=seq.length;
+  const Q=seq.map(x=>matmul(a.WQ,x,DK,DIM));
+  const K=seq.map(x=>matmul(a.WK,x,DK,DIM));
+  const V=seq.map(x=>matmul(a.WV,x,DV,DIM));
+  const sc=Math.sqrt(DK);
+  const weights=Q.map(q=>smx(K.map(k=>q.reduce((s,v,i)=>s+v*k[i],0)/sc),N));
+  const attended=weights.map(w=>w.reduce((acc,wi,j)=>acc.map((v,d)=>v+wi*V[j][d]),new Array(DV).fill(0)));
+  return{Q,K,V,weights,attended};
+}
+
+function attnBwd(a,seq,fwd,dAtt){
+  const N=seq.length;const{Q,K,V,weights}=fwd;
+  const sc=Math.sqrt(DK);
+  const dWQ=new Float32Array(DK*DIM),dWK=new Float32Array(DK*DIM),dWV=new Float32Array(DV*DIM);
+  for(let i=0;i<N;i++){
+    for(let j=0;j<N;j++)for(let d=0;d<DV;d++){
+      const g=weights[i][j]*dAtt[i][d];
+      for(let k=0;k<DIM;k++)dWV[d*DIM+k]+=g*seq[j][k];
+    }
+    const dW=new Array(N).fill(0);
+    for(let j=0;j<N;j++)for(let d=0;d<DV;d++)dW[j]+=dAtt[i][d]*V[j][d];
+    const dS=weights[i].map((w,j)=>{let s=0;for(let k=0;k<N;k++)s+=weights[i][k]*dW[k];return w*(dW[j]-s)/sc;});
+    const dQi=new Array(DK).fill(0);
+    for(let j=0;j<N;j++)for(let d=0;d<DK;d++)dQi[d]+=dS[j]*K[j][d];
+    for(let d=0;d<DK;d++)for(let k=0;k<DIM;k++)dWQ[d*DIM+k]+=dQi[d]*seq[i][k];
+    for(let j=0;j<N;j++)for(let d=0;d<DK;d++)for(let k=0;k<DIM;k++)dWK[d*DIM+k]+=dS[j]*Q[i][d]*seq[j][k];
+  }
+  a.t++;
+  adam(a.WQ,dWQ,a.mWQ,a.vWQ,a.t,LR);
+  adam(a.WK,dWK,a.mWK,a.vWK,a.t,LR);
+  adam(a.WV,dWV,a.mWV,a.vWV,a.t,LR);
+}
+
+function mlpFwdBwd(m,x,target){
+  const z1=matmul(m.W1,x,MLP_H,IN_DIM).map((v,i)=>v+m.b1[i]);
+  const a1=z1.map(relu);
+  const z2=matmul(m.W2,a1,MLP_H,MLP_H).map((v,i)=>v+m.b2[i]);
+  const a2=z2.map(relu);
+  const z3=matmul(m.W3,a2,m.Vw,MLP_H).map((v,i)=>v+m.b3[i]);
+  const probs=smx(z3,m.Vw);
+  const loss=-Math.log(probs[target]+1e-10);
+  // backward
+  const dz3=Array.from(probs).map((p,i)=>p-(i===target?1:0));
+  const dW3=new Float32Array(m.Vw*MLP_H);
+  for(let i=0;i<m.Vw;i++)for(let j=0;j<MLP_H;j++)dW3[i*MLP_H+j]=dz3[i]*a2[j];
+  const da2=new Float32Array(MLP_H);
+  for(let j=0;j<MLP_H;j++)for(let i=0;i<m.Vw;i++)da2[j]+=m.W3[i*MLP_H+j]*dz3[i];
+  const dz2=da2.map((v,i)=>v*(z2[i]>0?1:0));
+  const dW2=new Float32Array(MLP_H*MLP_H);
+  for(let i=0;i<MLP_H;i++)for(let j=0;j<MLP_H;j++)dW2[i*MLP_H+j]=dz2[i]*a1[j];
+  const da1=new Float32Array(MLP_H);
+  for(let j=0;j<MLP_H;j++)for(let i=0;i<MLP_H;i++)da1[j]+=m.W2[i*MLP_H+j]*dz2[i];
+  const dz1=da1.map((v,i)=>v*(z1[i]>0?1:0));
+  const dW1=new Float32Array(MLP_H*IN_DIM);
+  for(let i=0;i<MLP_H;i++)for(let j=0;j<IN_DIM;j++)dW1[i*IN_DIM+j]=dz1[i]*x[j];
+  const dx=new Float32Array(IN_DIM);
+  for(let j=0;j<IN_DIM;j++)for(let i=0;i<MLP_H;i++)dx[j]+=m.W1[i*IN_DIM+j]*dz1[i];
+  m.t++;
+  adam(m.W3,dW3,m.mW3,m.vW3,m.t,LR);
+  adam(m.b3,dz3,m.mb3,m.vb3,m.t,LR);
+  adam(m.W2,dW2,m.mW2,m.vW2,m.t,LR);
+  adam(m.b2,dz2,m.mb2,m.vb2,m.t,LR);
+  adam(m.W1,dW1,m.mW1,m.vW1,m.t,LR);
+  adam(m.b1,dz1,m.mb1,m.vb1,m.t,LR);
+  return{loss,dx:Array.from(dx)};
+}
+
+// ═══════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════
+let state={status:'idle',running:false,epoch:0,lossT:[],lossE:[],log:[],finals:null};
+
+function $(id){return document.getElementById(id);}
+
+function addLog(msg,cls=''){
+  state.log.push({msg,cls});
+  const box=$('log-box');
+  const d=document.createElement('div');
+  d.className='log-line'+(cls?' '+cls:'');
+  d.textContent=msg;
+  box.appendChild(d);
+  box.scrollTop=box.scrollHeight;
+}
+
+function setStatus(s,label){
+  state.status=s;
+  const dot=$('status-dot');
+  dot.className='status-dot '+s;
+  $('status-text').textContent=label;
+  $('btn-run').disabled=s==='running'||s==='init';
+  $('btn-stop').disabled=s!=='running'&&s!=='init';
+}
+
+function renderChart(){
+  const T=state.lossT,E=state.lossE;
+  if(!T.length)return;
+  const W=552,H=170,PL=40,PR=12,PT=12,PB=26;
+  const cW=W-PL-PR,cH=H-PT-PB;
+  const all=[...T,...E];
+  const minL=Math.min(...all)*0.95,maxL=Math.max(...all)*1.03;
+  const n=T.length;
+  const xS=i=>PL+(i/Math.max(n-1,1))*cW;
+  const yS=v=>PT+(1-(v-minL)/(maxL-minL+1e-9))*cH;
+  function path(data,color,dash){
+    const d=data.map((v,i)=>`${i===0?'M':'L'}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(' ');
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke',color);
+    p.setAttribute('stroke-width',dash?'1.5':'2');p.setAttribute('stroke-linecap','round');
+    if(dash)p.setAttribute('stroke-dasharray',dash);
+    return p;
+  }
+  function el(tag,attrs){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));return e;}
+  function txt(attrs,text){const e=el('text',attrs);e.textContent=text;return e;}
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.style.cssText='display:block;width:100%;height:auto;';
+  svg.appendChild(el('rect',{width:W,height:H,fill:'white'}));
+  // grid
+  [0,0.25,0.5,0.75,1].forEach(t=>{
+    const v=minL+(maxL-minL)*t,y=yS(v);
+    svg.appendChild(el('line',{x1:PL,y1:y,x2:PL+cW,y2:y,stroke:'#f0f0f5'}));
+    svg.appendChild(txt({x:PL-4,y:y+4,'text-anchor':'end','font-size':'9',fill:'#aeaeb2','font-family':'system-ui'},v.toFixed(2)));
+  });
+  [20,40,60,80,100].filter(e=>e<=n).forEach(e=>{
+    svg.appendChild(el('line',{x1:xS(e-1),y1:PT,x2:xS(e-1),y2:PT+cH,stroke:'#f5f5f7'}));
+    svg.appendChild(txt({x:xS(e-1),y:PT+cH+14,'text-anchor':'middle','font-size':'9',fill:'#aeaeb2','font-family':'system-ui'},e));
+  });
+  svg.appendChild(el('line',{x1:PL,y1:PT,x2:PL,y2:PT+cH,stroke:'#e5e5ea'}));
+  svg.appendChild(el('line',{x1:PL,y1:PT+cH,x2:PL+cW,y2:PT+cH,stroke:'#e5e5ea'}));
+  svg.appendChild(path(T,'#1c1c1e','4,3'));
+  svg.appendChild(path(E,'#e53935'));
+  if(E.length){
+    const v=E[E.length-1];
+    svg.appendChild(el('circle',{cx:xS(E.length-1),cy:yS(v),r:'3.5',fill:'#e53935'}));
+    svg.appendChild(txt({x:xS(E.length-1)+6,y:yS(v)+4,'font-size':'10',fill:'#e53935','font-weight':'600','font-family':'system-ui'},v.toFixed(3)));
+  }
+  if(T.length){
+    const v=T[T.length-1];
+    svg.appendChild(el('circle',{cx:xS(T.length-1),cy:yS(v),r:'3.5',fill:'#1c1c1e'}));
+    svg.appendChild(txt({x:xS(T.length-1)+6,y:yS(v)+4,'font-size':'10',fill:'#1c1c1e','font-weight':'600','font-family':'system-ui'},v.toFixed(3)));
+  }
+  const area=$('chart-area');
+  area.innerHTML='';area.style.height='';area.appendChild(svg);
+  $('chart-title').textContent=`Loss · train (dashed) · test / Alice (solid) · ep ${state.epoch}/100`;
+}
+
+function updateResults(){
+  const f=state.finals;if(!f)return;
+  $('result-grid').style.display='';
+  $('train-loss').textContent=f.trL.toFixed(4);
+  $('train-signal').textContent=`signal ${f.sigT.toFixed(4)} nats`;
+  $('test-loss').textContent=f.teL.toFixed(4);
+  $('test-signal').textContent=`signal ${f.sigE.toFixed(4)} nats`;
+  const gap=f.teL-f.trL;
+  const gapEl=$('test-gap');
+  gapEl.textContent=`gap ${gap>=0?'+':''}${gap.toFixed(4)}`;
+  gapEl.style.color=gap<0?'#34c759':'#ff9500';
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRAINING
+// ═══════════════════════════════════════════════════════════
+async function runTraining(){
+  if(state.running)return;
+  state.running=true;state.epoch=0;state.lossT=[];state.lossE=[];state.finals=null;
+  setStatus('init','Building…');
+
+  addLog('Word-Level Digest · D=32 · Unlearned Fixed Input','info');
+  addLog('Building train corpus (Genesis Ch.1–10)…');
+  await new Promise(r=>setTimeout(r,80));
+  const tr=buildData(GENESIS);
+
+  addLog('Building test corpus (Alice Ch.I)…');
+  await new Promise(r=>setTimeout(r,60));
+  const te=buildData(ALICE);
+
+  addLog('Building vocab & models…');
+  await new Promise(r=>setTimeout(r,60));
+
+  const vocab=[...new Set(tr.words)].sort();
+  const w2i=Object.fromEntries(vocab.map((w,i)=>[w,i]));
+  const Vw=vocab.length;
+  const logVw=Math.log(Vw);
+
+  addLog(`Train: ${tr.N} words · Test: ${te.N} words · Vw=${Vw} · random=${logVw.toFixed(4)}`);
+  addLog(`D=${DIM} · CTX=${CTX} words · QKV(${DK}/${DV}) · flat(${IN_DIM}d) · ${MLP_H}×2 MLP`);
+  addLog('─────────────────────────────────────────────────','sep');
+
+  resetRng(42);
+  const attn=buildAttn();
+  const mlp=buildMLP(Vw);
+
+  setStatus('running','Training…');
+
+  for(let ep=0;ep<EPOCHS;ep++){
+    if(!state.running)break;
+
+    // shuffle word pairs for train
+    const pairs=[];
+    for(let i=0;i<tr.N-1;i++) pairs.push(i);
+    pairs.sort(()=>rand()-0.5);
+
+    let sumLtr=0,cnt=0;
+    for(let b=0;b<pairs.length;b+=16){
+      if(!state.running)break;
+      const batch=pairs.slice(b,Math.min(b+16,pairs.length));
+      for(const wi of batch){
+        const target=(w2i[tr.words[wi+1]]!==undefined?w2i[tr.words[wi+1]]:0);
+        const start=Math.max(0,wi-CTX+1);
+        const ctx=tr.X.slice(start,wi+1);
+        while(ctx.length<CTX)ctx.unshift(new Float32Array(DIM));
+        const fwd=attnFwd(attn,ctx);
+        const flat=new Float32Array(CTX*DV);
+        fwd.attended.forEach((v,i)=>v.forEach((x,d)=>flat[i*DV+d]=x));
+        const{loss,dx}=mlpFwdBwd(mlp,flat,target);
+        sumLtr+=isFinite(loss)?loss:0;cnt++;
+        const dAttn=[];
+        for(let k=0;k<CTX;k++)dAttn.push(dx.slice(k*DV,(k+1)*DV));
+        attnBwd(attn,ctx,fwd,dAttn);
+      }
+      if(b%(16*8)===0)await new Promise(r=>setTimeout(r,0));
+    }
+    const avgLtr=sumLtr/Math.max(cnt,1);
+
+    // eval on test (no grad)
+    let sumLte=0,cnte=0;
+    for(let wi=0;wi<te.N-1;wi++){
+      const target=(w2i[te.words[wi+1]]!==undefined?w2i[te.words[wi+1]]:0);
+      const start=Math.max(0,wi-CTX+1);
+      const ctx=te.X.slice(start,wi+1);
+      while(ctx.length<CTX)ctx.unshift(new Float32Array(DIM));
+      const fwd=attnFwd(attn,ctx);
+      const flat=new Float32Array(CTX*DV);
+      fwd.attended.forEach((v,i)=>v.forEach((x,d)=>flat[i*DV+d]=x));
+      const z1=matmul(mlp.W1,flat,MLP_H,IN_DIM).map((v,i)=>relu(v+mlp.b1[i]));
+      const z2=matmul(mlp.W2,z1,MLP_H,MLP_H).map((v,i)=>relu(v+mlp.b2[i]));
+      const z3=matmul(mlp.W3,z2,Vw,MLP_H).map((v,i)=>v+mlp.b3[i]);
+      const p=smx(z3,Vw);
+      const loss=-Math.log(p[target]+1e-10);
+      sumLte+=isFinite(loss)?loss:0;cnte++;
+    }
+    const avgLte=sumLte/Math.max(cnte,1);
+
+    state.lossT.push(avgLtr);state.lossE.push(avgLte);
+    state.epoch=ep+1;
+    state.finals={trL:avgLtr,teL:avgLte,sigT:logVw-avgLtr,sigE:logVw-avgLte};
+    $('epoch-text').textContent=`ep ${ep+1}/100`;
+    renderChart();updateResults();
+
+    const m=(ep+1)%10===0;
+    addLog(`Ep${String(ep+1).padStart(3)}  tr=${avgLtr.toFixed(4)}  te=${avgLte.toFixed(4)}  gap=${(avgLte-avgLtr>=0?'+':'')}${(avgLte-avgLtr).toFixed(4)}${m?' ◆':''}`,m?'hi':'');
+    if(m)await new Promise(r=>setTimeout(r,0));
+  }
+
+  const f=state.finals;
+  addLog('─────────────────────────────────────────────────','sep');
+  addLog(`FINAL  train=${f.trL.toFixed(4)}  test=${f.teL.toFixed(4)}  gap=${(f.teL-f.trL>=0?'+':'')}${(f.teL-f.trL).toFixed(4)}`,'hi');
+  addLog(`Signal train=${f.sigT.toFixed(4)}  test=${f.sigE.toFixed(4)}  random=${Math.log(f.sigT+f.trL).toFixed(4)}`,'hi');
+
+  state.running=false;
+  setStatus('done','Complete');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════
+$('btn-run').onclick=()=>runTraining();
+$('btn-stop').onclick=()=>{state.running=false;setStatus('idle','Stopped');};
+$('btn-reset').onclick=()=>{
+  state.running=false;state.epoch=0;state.lossT=[];state.lossE=[];state.log=[];state.finals=null;
+  $('log-box').innerHTML='';$('result-grid').style.display='none';
+  $('chart-area').innerHTML='train (solid) · test (dashed)';
+  $('chart-area').style.height='180px';
+  $('epoch-text').textContent='';$('chart-title').textContent='Loss curve — press Run to begin';
+  setStatus('idle','Ready');
+};
+$('btn-copy').onclick=()=>{
+  navigator.clipboard.writeText(state.log.map(l=>l.msg).join('\n'))
+    .then(()=>{$('btn-copy').textContent='Copied ✓';setTimeout(()=>$('btn-copy').textContent='Copy Log',2000);});
+};
+</script>
+
+</body>
+</html>
