@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iterator Granularity Sweep · Within-Domain Archive</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #f2f2f7;
+    font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+    padding: 24px 16px 48px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    max-width: 640px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+/* ── Header ── */
+.header {
+padding: 28px 28px 20px;
+border-bottom: 1px solid #f0f0f5;
+}
+.eyebrow {
+font-size: 10px;
+font-weight: 600;
+letter-spacing: 0.12em;
+text-transform: uppercase;
+color: #aeaeb2;
+margin-bottom: 8px;
+}
+.title {
+font-size: 22px;
+font-weight: 700;
+color: #1c1c1e;
+letter-spacing: -0.02em;
+line-height: 1.2;
+margin-bottom: 4px;
+}
+.subtitle {
+font-size: 13px;
+color: #8e8e93;
+line-height: 1.5;
+margin-bottom: 14px;
+}
+.meta-row {
+display: flex;
+gap: 6px;
+flex-wrap: wrap;
+}
+.pill {
+background: #f2f2f7;
+border-radius: 20px;
+padding: 4px 10px;
+font-size: 11px;
+color: #6e6e73;
+font-weight: 500;
+}
+
+/* ── Section ── */
+.section {
+padding: 20px 28px;
+border-bottom: 1px solid #f0f0f5;
+}
+.section:last-child { border-bottom: none; }
+.section-title {
+font-size: 11px;
+font-weight: 600;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+color: #aeaeb2;
+margin-bottom: 14px;
+}
+
+/* ── 2×2 chart grid ── */
+.chart-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px;
+}
+.chart-cell {
+background: #f9f9fb;
+border-radius: 12px;
+padding: 10px 10px 6px;
+overflow: hidden;
+}
+.chart-cell-title {
+font-size: 11px;
+font-weight: 600;
+color: #3a3a3c;
+margin-bottom: 2px;
+}
+.chart-cell-desc {
+font-size: 9px;
+color: #aeaeb2;
+margin-bottom: 6px;
+}
+.chart-cell svg {
+display: block;
+width: 100%;
+height: auto;
+}
+
+/* ── Gap table ── */
+.gap-table {
+width: 100%;
+border-collapse: collapse;
+font-size: 12px;
+}
+.gap-table th {
+font-size: 10px;
+font-weight: 600;
+color: #aeaeb2;
+text-align: left;
+padding: 0 10px 8px 0;
+letter-spacing: 0.05em;
+text-transform: uppercase;
+}
+.gap-table th:not(:first-child) { text-align: right; }
+.gap-table td {
+padding: 7px 10px 7px 0;
+border-top: 1px solid #f0f0f5;
+color: #3a3a3c;
+font-variant-numeric: tabular-nums;
+}
+.gap-table td:not(:first-child) { text-align: right; }
+.gap-table tr:first-child td { border-top: none; }
+.res-label {
+font-weight: 700;
+color: #1c1c1e;
+font-size: 13px;
+}
+.res-desc { font-size: 10px; color: #aeaeb2; }
+.gap-c { color: #e53935; font-weight: 600; }
+.gap-r { color: #43a047; font-weight: 600; }
+.gap-a { color: #1e88e5; font-weight: 600; }
+.gap-cr { font-weight: 700; }
+.gap-cr.neg { color: #43a047; }
+.gap-cr.pos { color: #ff9500; }
+
+/* ── Finding ── */
+.finding-row {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 10px;
+margin-top: 14px;
+}
+.finding-cell {
+background: #f9f9fb;
+border-radius: 12px;
+padding: 12px 14px;
+}
+.finding-label {
+font-size: 10px;
+font-weight: 600;
+color: #aeaeb2;
+text-transform: uppercase;
+letter-spacing: 0.08em;
+margin-bottom: 4px;
+}
+.finding-value {
+font-size: 15px;
+font-weight: 700;
+color: #1c1c1e;
+line-height: 1.2;
+margin-bottom: 3px;
+}
+.finding-sub {
+font-size: 11px;
+color: #8e8e93;
+line-height: 1.4;
+}
+
+/* ── Legend ── */
+.legend {
+display: flex;
+gap: 16px;
+font-size: 11px;
+color: #8e8e93;
+margin-bottom: 12px;
+flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot {
+width: 8px; height: 8px; border-radius: 50%;
+flex-shrink: 0;
+}
+.legend-line-solid {
+width: 20px; height: 2px; border-radius: 1px; flex-shrink: 0;
+}
+.legend-line-dash {
+width: 20px; height: 0; border-top: 2px dashed;
+flex-shrink: 0; opacity: 0.5;
+}
+
+/* ── Footer ── */
+.footer {
+padding: 16px 28px;
+background: #f9f9fb;
+border-top: 1px solid #f0f0f5;
+display: flex;
+justify-content: space-between;
+align-items: center;
+flex-wrap: wrap;
+gap: 8px;
+}
+.footer-author {
+font-size: 12px;
+font-weight: 600;
+color: #3a3a3c;
+}
+.footer-date {
+font-size: 11px;
+color: #aeaeb2;
+}
+</style>
+
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+
+  <div class="header">
+    <div class="eyebrow">Quadratic Iterator · Archived Result · Granularity Series II</div>
+    <div class="title">Iterator Granularity Sweep · Within-Domain</div>
+    <div class="subtitle">
+      Overfit scaling vs encoding resolution · Cross-domain<br>
+      Train: Genesis Ch.1–10 &nbsp;·&nbsp; Test: Alice Ch.I
+    </div>
+    <div class="meta-row">
+      <span class="pill">D=3 fixed input</span>
+      <span class="pill">CTX=32</span>
+      <span class="pill">128×2 MLP</span>
+      <span class="pill">100 epochs</span>
+      <span class="pill">lr=0.003</span>
+      <span class="pill">Vw=482</span>
+      <span class="pill">seed=42</span>
+    </div>
+  </div>
+
+  <!-- Loss curves 2×2 -->
+
+  <div class="section">
+    <div class="section-title">Loss Curves · Train (dashed) vs Test (solid)</div>
+
+```
+<div class="legend">
+  <div class="legend-item">
+    <div class="legend-line-solid" style="background:#e53935"></div>
+    Iterator (C) test
+  </div>
+  <div class="legend-item">
+    <div class="legend-line-dash" style="border-color:#e53935"></div>
+    Iterator train
+  </div>
+  <div class="legend-item">
+    <div class="legend-line-solid" style="background:#1e88e5"></div>
+    Raw (A) test
+  </div>
+  <div class="legend-item">
+    <div class="legend-line-solid" style="background:#43a047"></div>
+    Random (R) test
+  </div>
+</div>
+
+<div class="chart-grid" id="chart-grid"></div>
+```
+
+  </div>
+
+  <!-- Gap table -->
+
+  <div class="section">
+    <div class="section-title">Generalisation Gap (test − train) at Epoch 100</div>
+    <table class="gap-table">
+      <thead>
+        <tr>
+          <th>Resolution</th>
+          <th>C gap</th>
+          <th>R gap</th>
+          <th>A gap</th>
+          <th>C − R</th>
+        </tr>
+      </thead>
+      <tbody id="gap-tbody"></tbody>
+    </table>
+
+```
+<div class="finding-row">
+  <div class="finding-cell">
+    <div class="finding-label">Key finding</div>
+    <div class="finding-value">C sits on the parity axis</div>
+    <div class="finding-sub">Iterator overfit range: +0.013 to +0.050 across 24× resolution change — near zero throughout</div>
+  </div>
+  <div class="finding-cell">
+    <div class="finding-label">C − R trend</div>
+    <div class="finding-value">R tracks C at fine windows</div>
+    <div class="finding-sub">At W=1, C−R≈+0.003 (indistinguishable). Gap opens as window grows to −0.098 at W=24</div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- Conditions -->
+
+  <div class="section">
+    <div class="section-title">Conditions</div>
+    <table class="gap-table">
+      <thead>
+        <tr>
+          <th>Label</th>
+          <th style="text-align:left">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="gap-c">C · Iterator</span></td>
+          <td style="text-align:left;color:#6e6e73">[mean_b0, mean_b1, D*_digest] · quad averaged over W bits · digest at word boundary · fixed input</td>
+        </tr>
+        <tr>
+          <td><span class="gap-a">A · Raw</span></td>
+          <td style="text-align:left;color:#6e6e73">Raw triplet tokens · learned D=3 embedding · trained end-to-end</td>
+        </tr>
+        <tr>
+          <td><span class="gap-r">R · Random</span></td>
+          <td style="text-align:left;color:#6e6e73">Gaussian noise D=3 · fixed input · control condition</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+
+  <div class="footer">
+    <div class="footer-author">Phillip Somerville · @unitambo</div>
+    <div class="footer-date">2026 · Iterator Granularity Sweep v1.0</div>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────
+const RUNS = [{"label": "W=1", "desc": "1-bit", "bits": 1, "gapC": 0.013, "gapR": 0.0099, "gapA": 0.3133, "trC": [6.179, 6.169, 6.158, 6.146, 6.132, 6.115, 6.096, 6.074, 6.05, 6.022, 5.992, 5.96, 5.925, 5.887, 5.847, 5.805, 5.762, 5.718, 5.673, 5.627, 5.58, 5.534, 5.49, 5.446, 5.404, 5.365, 5.327, 5.293, 5.261, 5.232, 5.206, 5.182, 5.159, 5.137, 5.116, 5.096, 5.075, 5.055, 5.035, 5.015, 4.996, 4.978, 4.961, 4.944, 4.929, 4.915, 4.903, 4.892, 4.883, 4.875, 4.868, 4.862, 4.856, 4.851, 4.846, 4.841, 4.836, 4.831, 4.826, 4.821, 4.816, 4.811, 4.807, 4.803, 4.8, 4.798, 4.796, 4.794, 4.793, 4.792, 4.792, 4.791, 4.791, 4.791, 4.791, 4.792, 4.792, 4.791, 4.791, 4.791, 4.791, 4.79, 4.79, 4.79, 4.79, 4.79, 4.79, 4.79, 4.789, 4.789, 4.789, 4.789, 4.789, 4.789, 4.789, 4.788, 4.788, 4.788, 4.788, 4.787], "teC": [6.163, 6.153, 6.142, 6.127, 6.11, 6.09, 6.067, 6.04, 6.011, 5.979, 5.943, 5.904, 5.862, 5.818, 5.772, 5.723, 5.673, 5.621, 5.568, 5.513, 5.458, 5.404, 5.351, 5.302, 5.256, 5.213, 5.173, 5.138, 5.105, 5.077, 5.052, 5.03, 5.01, 4.992, 4.977, 4.962, 4.949, 4.937, 4.927, 4.918, 4.911, 4.905, 4.901, 4.899, 4.899, 4.901, 4.902, 4.902, 4.9, 4.897, 4.893, 4.887, 4.881, 4.873, 4.864, 4.854, 4.844, 4.833, 4.821, 4.813, 4.806, 4.803, 4.801, 4.802, 4.804, 4.808, 4.81, 4.81, 4.809, 4.807, 4.804, 4.802, 4.802, 4.803, 4.803, 4.802, 4.8, 4.8, 4.802, 4.803, 4.804, 4.803, 4.802, 4.799, 4.798, 4.798, 4.8, 4.803, 4.805, 4.805, 4.804, 4.802, 4.799, 4.798, 4.798, 4.8, 4.802, 4.802, 4.802, 4.8], "teA": [6.159, 6.146, 6.131, 6.113, 6.092, 6.067, 6.04, 6.009, 5.975, 5.938, 5.898, 5.855, 5.81, 5.762, 5.712, 5.661, 5.608, 5.554, 5.498, 5.443, 5.386, 5.332, 5.281, 5.231, 5.185, 5.142, 5.101, 5.065, 5.031, 5.001, 4.974, 4.95, 4.929, 4.91, 4.894, 4.88, 4.868, 4.858, 4.85, 4.845, 4.841, 4.839, 4.839, 4.841, 4.845, 4.851, 4.856, 4.86, 4.862, 4.864, 4.864, 4.863, 4.861, 4.858, 4.854, 4.849, 4.843, 4.836, 4.828, 4.82, 4.812, 4.806, 4.801, 4.799, 4.798, 4.798, 4.8, 4.803, 4.806, 4.81, 4.814, 4.819, 4.824, 4.828, 4.83, 4.83, 4.83, 4.828, 4.825, 4.822, 4.818, 4.816, 4.815, 4.816, 4.818, 4.822, 4.827, 4.832, 4.835, 4.837, 4.837, 4.836, 4.835, 4.834, 4.835, 4.839, 4.843, 4.846, 4.847, 4.849], "teR": [6.166, 6.159, 6.15, 6.138, 6.124, 6.107, 6.087, 6.065, 6.039, 6.012, 5.982, 5.949, 5.914, 5.877, 5.838, 5.797, 5.754, 5.71, 5.665, 5.618, 5.571, 5.523, 5.474, 5.426, 5.377, 5.328, 5.282, 5.237, 5.195, 5.155, 5.118, 5.083, 5.051, 5.021, 4.994, 4.969, 4.947, 4.927, 4.909, 4.893, 4.88, 4.867, 4.856, 4.847, 4.84, 4.834, 4.83, 4.827, 4.825, 4.825, 4.826, 4.828, 4.832, 4.837, 4.843, 4.849, 4.852, 4.855, 4.856, 4.856, 4.855, 4.855, 4.85, 4.845, 4.84, 4.834, 4.827, 4.819, 4.81, 4.8, 4.793, 4.789, 4.787, 4.786, 4.787, 4.789, 4.793, 4.799, 4.805, 4.809, 4.812, 4.813, 4.812, 4.81, 4.807, 4.802, 4.798, 4.795, 4.795, 4.796, 4.798, 4.801, 4.804, 4.806, 4.807, 4.806, 4.805, 4.803, 4.8, 4.799]}, {"label": "W=8", "desc": "character", "bits": 8, "gapC": 0.0126, "gapR": 0.039, "gapA": 0.3032, "trC": [6.179, 6.17, 6.16, 6.149, 6.135, 6.119, 6.101, 6.08, 6.056, 6.029, 5.999, 5.967, 5.932, 5.896, 5.857, 5.816, 5.773, 5.729, 5.684, 5.638, 5.591, 5.544, 5.496, 5.449, 5.403, 5.358, 5.315, 5.274, 5.236, 5.2, 5.167, 5.138, 5.111, 5.087, 5.067, 5.048, 5.031, 5.015, 4.999, 4.982, 4.964, 4.946, 4.927, 4.909, 4.891, 4.875, 4.861, 4.849, 4.838, 4.828, 4.82, 4.812, 4.806, 4.802, 4.8, 4.799, 4.799, 4.799, 4.799, 4.799, 4.799, 4.799, 4.798, 4.798, 4.797, 4.797, 4.795, 4.794, 4.793, 4.793, 4.793, 4.793, 4.793, 4.793, 4.793, 4.793, 4.793, 4.792, 4.792, 4.792, 4.792, 4.792, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.79, 4.79, 4.79, 4.79, 4.79, 4.79, 4.79, 4.789, 4.789, 4.789], "teC": [6.165, 6.156, 6.145, 6.131, 6.115, 6.095, 6.072, 6.046, 6.017, 5.984, 5.949, 5.911, 5.871, 5.827, 5.782, 5.734, 5.684, 5.632, 5.579, 5.524, 5.468, 5.412, 5.355, 5.298, 5.244, 5.192, 5.143, 5.098, 5.056, 5.018, 4.984, 4.954, 4.928, 4.906, 4.887, 4.872, 4.86, 4.85, 4.84, 4.831, 4.823, 4.815, 4.808, 4.803, 4.799, 4.797, 4.798, 4.799, 4.801, 4.804, 4.809, 4.815, 4.822, 4.829, 4.834, 4.839, 4.842, 4.844, 4.844, 4.843, 4.84, 4.837, 4.832, 4.826, 4.819, 4.812, 4.804, 4.798, 4.793, 4.791, 4.79, 4.79, 4.791, 4.794, 4.797, 4.802, 4.806, 4.809, 4.81, 4.81, 4.808, 4.806, 4.802, 4.799, 4.798, 4.798, 4.8, 4.802, 4.804, 4.806, 4.806, 4.806, 4.805, 4.803, 4.8, 4.799, 4.799, 4.8, 4.801, 4.802], "teA": [6.159, 6.146, 6.132, 6.114, 6.093, 6.069, 6.042, 6.011, 5.976, 5.939, 5.899, 5.856, 5.81, 5.762, 5.711, 5.659, 5.605, 5.55, 5.494, 5.437, 5.381, 5.327, 5.276, 5.227, 5.181, 5.139, 5.1, 5.064, 5.031, 5.002, 4.975, 4.953, 4.932, 4.915, 4.9, 4.887, 4.877, 4.868, 4.862, 4.857, 4.855, 4.855, 4.856, 4.86, 4.865, 4.871, 4.875, 4.878, 4.88, 4.881, 4.88, 4.878, 4.876, 4.871, 4.866, 4.859, 4.852, 4.844, 4.836, 4.83, 4.825, 4.821, 4.819, 4.818, 4.818, 4.819, 4.82, 4.821, 4.823, 4.825, 4.828, 4.832, 4.836, 4.839, 4.841, 4.841, 4.84, 4.838, 4.836, 4.834, 4.833, 4.833, 4.836, 4.84, 4.845, 4.85, 4.853, 4.856, 4.856, 4.857, 4.856, 4.856, 4.858, 4.86, 4.863, 4.866, 4.869, 4.871, 4.873, 4.874], "teR": [6.166, 6.159, 6.15, 6.138, 6.124, 6.107, 6.087, 6.065, 6.04, 6.013, 5.982, 5.95, 5.915, 5.878, 5.838, 5.797, 5.753, 5.708, 5.661, 5.614, 5.565, 5.515, 5.465, 5.415, 5.364, 5.316, 5.269, 5.225, 5.183, 5.144, 5.107, 5.074, 5.043, 5.015, 4.99, 4.967, 4.947, 4.93, 4.914, 4.9, 4.888, 4.878, 4.869, 4.862, 4.856, 4.852, 4.849, 4.848, 4.847, 4.848, 4.85, 4.854, 4.859, 4.863, 4.866, 4.867, 4.868, 4.868, 4.866, 4.864, 4.861, 4.861, 4.858, 4.852, 4.845, 4.837, 4.827, 4.819, 4.811, 4.805, 4.802, 4.801, 4.803, 4.806, 4.811, 4.815, 4.817, 4.817, 4.816, 4.813, 4.808, 4.804, 4.802, 4.801, 4.801, 4.803, 4.806, 4.81, 4.812, 4.811, 4.81, 4.809, 4.807, 4.806, 4.806, 4.807, 4.809, 4.81, 4.812, 4.812]}, {"label": "W=16", "desc": "bigram", "bits": 16, "gapC": 0.0151, "gapR": 0.0833, "gapA": 0.2772, "trC": [6.179, 6.17, 6.161, 6.15, 6.137, 6.121, 6.102, 6.081, 6.057, 6.03, 6.001, 5.969, 5.934, 5.897, 5.858, 5.818, 5.775, 5.731, 5.686, 5.639, 5.592, 5.544, 5.496, 5.449, 5.402, 5.356, 5.313, 5.271, 5.232, 5.196, 5.163, 5.134, 5.107, 5.084, 5.063, 5.045, 5.028, 5.012, 4.995, 4.979, 4.961, 4.943, 4.925, 4.907, 4.891, 4.875, 4.861, 4.849, 4.838, 4.829, 4.821, 4.814, 4.808, 4.804, 4.801, 4.8, 4.8, 4.8, 4.8, 4.8, 4.8, 4.8, 4.799, 4.799, 4.798, 4.798, 4.796, 4.795, 4.794, 4.794, 4.794, 4.794, 4.794, 4.794, 4.794, 4.793, 4.793, 4.793, 4.793, 4.792, 4.792, 4.792, 4.792, 4.792, 4.792, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.791, 4.79, 4.79, 4.79, 4.79, 4.79], "teC": [6.165, 6.157, 6.146, 6.133, 6.116, 6.097, 6.074, 6.047, 6.018, 5.986, 5.951, 5.913, 5.872, 5.829, 5.783, 5.735, 5.685, 5.633, 5.579, 5.523, 5.467, 5.409, 5.351, 5.294, 5.238, 5.186, 5.136, 5.09, 5.048, 5.01, 4.976, 4.947, 4.921, 4.899, 4.881, 4.866, 4.855, 4.845, 4.836, 4.828, 4.82, 4.813, 4.807, 4.803, 4.8, 4.799, 4.8, 4.802, 4.805, 4.809, 4.814, 4.821, 4.828, 4.835, 4.841, 4.845, 4.848, 4.849, 4.848, 4.845, 4.842, 4.837, 4.832, 4.825, 4.818, 4.811, 4.804, 4.8, 4.797, 4.795, 4.795, 4.796, 4.797, 4.8, 4.803, 4.806, 4.809, 4.811, 4.812, 4.813, 4.812, 4.81, 4.808, 4.805, 4.803, 4.802, 4.802, 4.801, 4.802, 4.802, 4.804, 4.805, 4.807, 4.808, 4.809, 4.809, 4.808, 4.807, 4.806, 4.805], "teA": [6.159, 6.147, 6.132, 6.115, 6.094, 6.07, 6.043, 6.012, 5.978, 5.941, 5.901, 5.858, 5.812, 5.763, 5.712, 5.659, 5.605, 5.549, 5.492, 5.435, 5.379, 5.324, 5.273, 5.224, 5.179, 5.137, 5.098, 5.063, 5.031, 5.003, 4.979, 4.958, 4.941, 4.926, 4.913, 4.903, 4.895, 4.889, 4.884, 4.882, 4.882, 4.883, 4.885, 4.889, 4.893, 4.896, 4.897, 4.897, 4.896, 4.894, 4.891, 4.887, 4.882, 4.875, 4.868, 4.86, 4.852, 4.845, 4.84, 4.836, 4.833, 4.833, 4.833, 4.835, 4.837, 4.84, 4.842, 4.845, 4.847, 4.849, 4.85, 4.851, 4.851, 4.851, 4.85, 4.847, 4.846, 4.845, 4.845, 4.845, 4.847, 4.849, 4.852, 4.855, 4.857, 4.86, 4.862, 4.864, 4.864, 4.864, 4.864, 4.864, 4.866, 4.868, 4.869, 4.872, 4.874, 4.876, 4.877, 4.879], "teR": [6.166, 6.159, 6.15, 6.138, 6.124, 6.107, 6.087, 6.064, 6.039, 6.012, 5.982, 5.949, 5.913, 5.876, 5.836, 5.793, 5.749, 5.703, 5.656, 5.607, 5.557, 5.506, 5.454, 5.403, 5.351, 5.3, 5.252, 5.206, 5.163, 5.123, 5.086, 5.052, 5.021, 4.993, 4.967, 4.945, 4.925, 4.907, 4.891, 4.877, 4.865, 4.854, 4.845, 4.837, 4.831, 4.827, 4.825, 4.825, 4.825, 4.828, 4.831, 4.837, 4.843, 4.851, 4.858, 4.864, 4.867, 4.869, 4.87, 4.869, 4.867, 4.863, 4.858, 4.852, 4.844, 4.836, 4.828, 4.82, 4.813, 4.809, 4.806, 4.805, 4.806, 4.808, 4.811, 4.815, 4.818, 4.822, 4.825, 4.826, 4.827, 4.826, 4.825, 4.824, 4.822, 4.822, 4.822, 4.821, 4.822, 4.823, 4.824, 4.826, 4.829, 4.831, 4.833, 4.835, 4.835, 4.836, 4.837, 4.837]}, {"label": "W=24", "desc": "triplet", "bits": 24, "gapC": 0.0496, "gapR": 0.1475, "gapA": 0.3416, "trC": [6.178, 6.169, 6.16, 6.149, 6.135, 6.119, 6.101, 6.079, 6.055, 6.027, 5.997, 5.965, 5.93, 5.893, 5.854, 5.812, 5.769, 5.724, 5.678, 5.631, 5.583, 5.535, 5.486, 5.438, 5.392, 5.346, 5.302, 5.26, 5.221, 5.185, 5.151, 5.121, 5.094, 5.069, 5.047, 5.028, 5.01, 4.992, 4.976, 4.958, 4.941, 4.923, 4.905, 4.887, 4.87, 4.855, 4.841, 4.829, 4.818, 4.808, 4.8, 4.793, 4.787, 4.783, 4.78, 4.779, 4.778, 4.778, 4.778, 4.778, 4.778, 4.777, 4.777, 4.777, 4.776, 4.775, 4.774, 4.773, 4.772, 4.772, 4.772, 4.772, 4.772, 4.772, 4.771, 4.771, 4.771, 4.771, 4.77, 4.77, 4.77, 4.77, 4.77, 4.77, 4.769, 4.769, 4.769, 4.769, 4.769, 4.769, 4.768, 4.768, 4.768, 4.768, 4.768, 4.768, 4.768, 4.767, 4.767, 4.767], "teC": [6.165, 6.157, 6.146, 6.132, 6.116, 6.096, 6.073, 6.046, 6.017, 5.985, 5.95, 5.912, 5.872, 5.828, 5.782, 5.734, 5.684, 5.631, 5.577, 5.522, 5.465, 5.408, 5.351, 5.294, 5.241, 5.19, 5.142, 5.098, 5.057, 5.02, 4.987, 4.958, 4.932, 4.911, 4.893, 4.878, 4.867, 4.857, 4.849, 4.841, 4.834, 4.828, 4.823, 4.82, 4.818, 4.818, 4.82, 4.823, 4.827, 4.833, 4.839, 4.846, 4.851, 4.856, 4.86, 4.862, 4.863, 4.862, 4.859, 4.854, 4.848, 4.841, 4.834, 4.826, 4.819, 4.812, 4.808, 4.805, 4.805, 4.806, 4.808, 4.81, 4.812, 4.814, 4.816, 4.818, 4.82, 4.821, 4.821, 4.822, 4.822, 4.822, 4.821, 4.819, 4.817, 4.815, 4.813, 4.811, 4.81, 4.81, 4.81, 4.81, 4.811, 4.812, 4.814, 4.815, 4.816, 4.816, 4.817, 4.817], "teA": [6.159, 6.147, 6.132, 6.114, 6.094, 6.069, 6.042, 6.011, 5.976, 5.939, 5.899, 5.855, 5.809, 5.761, 5.71, 5.657, 5.602, 5.547, 5.491, 5.436, 5.383, 5.333, 5.285, 5.241, 5.2, 5.162, 5.128, 5.097, 5.07, 5.047, 5.026, 5.009, 4.994, 4.982, 4.972, 4.964, 4.958, 4.954, 4.951, 4.951, 4.949, 4.946, 4.941, 4.936, 4.93, 4.924, 4.917, 4.909, 4.902, 4.894, 4.885, 4.877, 4.87, 4.864, 4.86, 4.857, 4.856, 4.856, 4.857, 4.86, 4.863, 4.868, 4.872, 4.875, 4.877, 4.877, 4.876, 4.873, 4.87, 4.866, 4.862, 4.859, 4.858, 4.857, 4.857, 4.859, 4.861, 4.863, 4.867, 4.87, 4.873, 4.876, 4.879, 4.88, 4.881, 4.881, 4.881, 4.88, 4.88, 4.881, 4.882, 4.884, 4.885, 4.887, 4.889, 4.892, 4.894, 4.896, 4.898, 4.9], "teR": [6.166, 6.159, 6.149, 6.137, 6.123, 6.106, 6.086, 6.063, 6.038, 6.01, 5.979, 5.946, 5.91, 5.872, 5.831, 5.789, 5.744, 5.697, 5.649, 5.6, 5.549, 5.497, 5.445, 5.393, 5.341, 5.292, 5.244, 5.2, 5.158, 5.119, 5.083, 5.05, 5.02, 4.993, 4.97, 4.949, 4.931, 4.915, 4.901, 4.889, 4.879, 4.87, 4.864, 4.858, 4.855, 4.854, 4.854, 4.856, 4.86, 4.865, 4.87, 4.876, 4.881, 4.884, 4.885, 4.885, 4.884, 4.881, 4.873, 4.873, 4.867, 4.86, 4.852, 4.844, 4.836, 4.829, 4.824, 4.82, 4.819, 4.819, 4.82, 4.823, 4.825, 4.828, 4.831, 4.833, 4.835, 4.836, 4.837, 4.838, 4.838, 4.839, 4.838, 4.837, 4.837, 4.836, 4.836, 4.836, 4.837, 4.839, 4.84, 4.842, 4.843, 4.845, 4.847, 4.849, 4.852, 4.854, 4.856, 4.857]}];
+
+// ── SVG helper ────────────────────────────────────────────────────
+function el(tag, attrs, children) {
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  if (attrs) Object.entries(attrs).forEach(([k,v]) => e.setAttribute(k, v));
+  if (children) children.forEach(c => e.appendChild(c));
+  return e;
+}
+function txt(tag, attrs, text) {
+  const e = el(tag, attrs);
+  e.textContent = text;
+  return e;
+}
+
+function makeCurveChart(run) {
+  const W=260, H=130, PL=28, PR=8, PT=8, PB=18;
+  const cW=W-PL-PR, cH=H-PT-PB;
+
+  const all = [...run.trC, ...run.teC, ...run.teA, ...run.teR];
+  const minL = Math.min(...all)*0.98;
+  const maxL = Math.max(...all)*1.02;
+  const n = run.trC.length;
+
+  const xS = i => PL + (i/Math.max(n-1,1))*cW;
+  const yS = v => PT + (1-(v-minL)/(maxL-minL+1e-9))*cH;
+
+  function path(data, color, dash) {
+    if (!data || !data.length) return null;
+    const d = data.map((v,i) => `${i===0?'M':'L'}${xS(i).toFixed(1)},${yS(v).toFixed(1)}`).join(' ');
+    const p = el('path', {d, fill:'none', stroke:color, 'stroke-width': dash?'1':'1.5', 'stroke-linecap':'round'});
+    if (dash) p.setAttribute('stroke-dasharray', dash);
+    p.setAttribute('opacity', dash ? '0.4' : '1');
+    return p;
+  }
+
+  const svg = el('svg', {viewBox:`0 0 ${W} ${H}`, xmlns:'http://www.w3.org/2000/svg'});
+  svg.style.cssText = 'display:block;width:100%;height:auto;';
+  svg.appendChild(el('rect', {width:W, height:H, fill:'#f9f9fb', rx:'8'}));
+
+  // grid lines
+  [0, 0.5, 1].forEach(t => {
+    const v = minL + (maxL-minL)*t;
+    const y = yS(v);
+    svg.appendChild(el('line', {x1:PL, y1:y, x2:PL+cW, y2:y, stroke:'#e5e5ea'}));
+    svg.appendChild(txt('text', {x:PL-3, y:y+3, 'text-anchor':'end', 'font-size':'7', fill:'#c7c7cc', 'font-family':'system-ui'}, v.toFixed(1)));
+  });
+
+  // epoch ticks
+  [25,50,75,100].filter(e => e <= n).forEach(e => {
+    svg.appendChild(el('line', {x1:xS(e-1), y1:PT, x2:xS(e-1), y2:PT+cH, stroke:'#e5e5ea'}));
+    svg.appendChild(txt('text', {x:xS(e-1), y:PT+cH+11, 'text-anchor':'middle', 'font-size':'7', fill:'#c7c7cc', 'font-family':'system-ui'}, e));
+  });
+
+  svg.appendChild(el('line', {x1:PL, y1:PT, x2:PL, y2:PT+cH, stroke:'#e5e5ea'}));
+  svg.appendChild(el('line', {x1:PL, y1:PT+cH, x2:PL+cW, y2:PT+cH, stroke:'#e5e5ea'}));
+
+  // train dashed
+  svg.appendChild(path(run.trC, '#e53935', '3,2'));
+
+  // test solid
+  svg.appendChild(path(run.teR, '#43a047'));
+  svg.appendChild(path(run.teA, '#1e88e5'));
+  svg.appendChild(path(run.teC, '#e53935'));
+
+  // end dots + labels
+  [[run.teC,'#e53935'],[run.teA,'#1e88e5'],[run.teR,'#43a047']].forEach(([data,color]) => {
+    if (!data || !data.length) return;
+    const v = data[data.length-1];
+    svg.appendChild(el('circle', {cx:xS(data.length-1), cy:yS(v), r:'2.5', fill:color}));
+  });
+
+  return svg;
+}
+
+// ── Render charts ─────────────────────────────────────────────────
+const grid = document.getElementById('chart-grid');
+RUNS.forEach(run => {
+  const cell = document.createElement('div');
+  cell.className = 'chart-cell';
+  cell.innerHTML = `<div class="chart-cell-title">${run.label}</div><div class="chart-cell-desc">${run.bits} bit${run.bits>1?'s':''} per token · ${run.desc}</div>`;
+  cell.appendChild(makeCurveChart(run));
+  grid.appendChild(cell);
+});
+
+// ── Render gap table ──────────────────────────────────────────────
+const tbody = document.getElementById('gap-tbody');
+RUNS.forEach(run => {
+  const cr = run.gapC - run.gapR;
+  const crClass = cr < 0 ? 'neg' : 'pos';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <span class="res-label">${run.label}</span><br>
+      <span class="res-desc">${run.desc}</span>
+    </td>
+    <td class="gap-c">${run.gapC >= 0 ? '+' : ''}${run.gapC.toFixed(4)}</td>
+    <td class="gap-r">${run.gapR >= 0 ? '+' : ''}${run.gapR.toFixed(4)}</td>
+    <td class="gap-a">${run.gapA >= 0 ? '+' : ''}${run.gapA.toFixed(4)}</td>
+    <td class="gap-cr ${crClass}">${cr >= 0 ? '+' : ''}${cr.toFixed(4)}</td>
+  `;
+  tbody.appendChild(tr);
+});
+</script>
+
+</body>
+</html>
