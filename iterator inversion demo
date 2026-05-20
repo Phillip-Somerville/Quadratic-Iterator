@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bijective Quadratic Iterator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap');
+
+:root {
+–bg:      #f2f2f7;
+–surface: rgba(255,255,255,0.75);
+–border:  rgba(0,0,0,0.08);
+–border2: rgba(0,0,0,0.04);
+–text:    #1c1c1e;
+–muted:   #8e8e93;
+–blue:    #007aff;
+–green:   #34c759;
+–red:     #ff3b30;
+–mono:    ‘JetBrains Mono’, monospace;
+}
+
+- { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: var(–mono);
+font-size: 12px;
+min-height: 100vh;
+padding: 44px 36px;
+-webkit-font-smoothing: antialiased;
+}
+
+.input-block {
+background: var(–surface);
+backdrop-filter: blur(24px) saturate(180%);
+-webkit-backdrop-filter: blur(24px) saturate(180%);
+border: 1px solid var(–border);
+border-radius: 16px;
+padding: 24px;
+margin-bottom: 16px;
+box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+textarea {
+width: 100%;
+background: rgba(118,118,128,0.08);
+border: 1px solid var(–border);
+border-radius: 10px;
+color: var(–text);
+font-family: Georgia, ‘Times New Roman’, serif;
+font-size: 17px;
+line-height: 1.6;
+padding: 12px 14px;
+resize: vertical;
+min-height: 68px;
+outline: none;
+margin-bottom: 14px;
+transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+textarea:focus {
+border-color: var(–blue);
+box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+}
+
+.controls { display: flex; align-items: center; gap: 10px; }
+
+.seed-pill {
+display: flex; align-items: center; gap: 7px;
+background: rgba(118,118,128,0.08);
+border: 1px solid var(–border);
+border-radius: 8px;
+padding: 7px 12px;
+}
+.seed-pill span { color: var(–muted); font-size: 10.5px; }
+
+input[type=“number”] {
+background: transparent; border: none;
+color: var(–text); font-family: var(–mono);
+font-size: 12px; width: 80px; outline: none;
+}
+
+button {
+margin-left: auto;
+background: var(–blue); border: none; border-radius: 8px;
+color: #fff; font-family: var(–mono); font-size: 11.5px;
+font-weight: 600; padding: 8px 20px; cursor: pointer;
+transition: opacity 0.12s, transform 0.1s;
+}
+button:hover  { opacity: 0.87; }
+button:active { transform: scale(0.97); }
+
+.banner {
+border-radius: 12px; padding: 14px 18px;
+margin-bottom: 16px; display: none;
+align-items: center; gap: 12px;
+}
+.banner.show { display: flex; }
+.banner.ok   { background: rgba(52,199,89,0.10);  border: 1px solid rgba(52,199,89,0.28); }
+.banner.fail { background: rgba(255,59,48,0.08);  border: 1px solid rgba(255,59,48,0.25); }
+
+.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.ok   .dot { background: var(–green); }
+.fail .dot { background: var(–red); }
+
+.banner-main { font-family: Georgia, serif; font-size: 14.5px; color: var(–text); margin-bottom: 3px; }
+.banner-path { color: var(–muted); font-size: 10.5px; word-break: break-all; }
+
+.cards {
+display: grid; grid-template-columns: 1fr 1fr;
+gap: 12px; margin-bottom: 14px;
+}
+
+.card {
+background: var(–surface);
+backdrop-filter: blur(24px) saturate(180%);
+-webkit-backdrop-filter: blur(24px) saturate(180%);
+border: 1px solid var(–border); border-radius: 14px;
+padding: 16px 18px;
+box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.stat { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(–border2); }
+.stat:last-child { border-bottom: none; }
+.sk { color: var(–muted); font-size: 10.5px; }
+.sv { font-weight: 600; font-size: 11.5px; }
+.c-blue  { color: var(–blue); }
+.c-green { color: var(–green); }
+.c-red   { color: var(–red); }
+.c-muted { color: var(–muted); }
+
+/* bit stream visualisation */
+.vis-card {
+background: var(–surface);
+backdrop-filter: blur(24px) saturate(180%);
+-webkit-backdrop-filter: blur(24px) saturate(180%);
+border: 1px solid var(–border); border-radius: 14px;
+padding: 16px 18px; margin-bottom: 14px;
+box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.vis-label { color: var(–muted); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+
+.bitvis { display: flex; flex-wrap: wrap; gap: 2px; max-height: 60px; overflow: hidden; }
+.bbit { width: 7px; height: 7px; border-radius: 1px; flex-shrink: 0; }
+/* injection point bits */
+.b-inj-0 { background: rgba(0,122,255,0.25); }   /* zero event, bit 0 */
+.b-inj-1 { background: var(–blue); }             /* zero event, bit 1 */
+/* non-injection steps */
+.b-pos { background: var(–green); opacity: 0.5; }
+.b-neg { background: var(–red); opacity: 0.4; }
+.b-z   { background: rgba(0,0,0,0.08); }          /* shouldn’t appear in non-injection */
+
+.tbl-card {
+background: var(–surface);
+backdrop-filter: blur(24px) saturate(180%);
+-webkit-backdrop-filter: blur(24px) saturate(180%);
+border: 1px solid var(–border); border-radius: 14px;
+overflow: hidden; margin-bottom: 14px;
+box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.tbl-scroll { max-height: 280px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
+
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+
+th {
+color: var(–muted); font-size: 9.5px; letter-spacing: 0.8px;
+text-transform: uppercase; text-align: left;
+padding: 9px 14px; border-bottom: 1px solid var(–border);
+position: sticky; top: 0;
+background: rgba(242,242,247,0.92);
+backdrop-filter: blur(8px); font-weight: 500;
+}
+
+td { padding: 4px 14px; font-variant-numeric: tabular-nums; white-space: nowrap; border-bottom: 1px solid var(–border2); }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(0,0,0,0.015); }
+tr.inject td { background: rgba(0,122,255,0.04); }
+tr.inject td:first-child { border-left: 2px solid var(–blue); }
+
+.jp-t { color: var(–green); font-weight: 600; }
+.jn-t { color: var(–red); font-weight: 600; }
+.jz-t { color: var(–blue); font-weight: 600; }   /* zero = injection */
+.f1   { color: var(–blue); }
+.f0   { color: var(–muted); }
+.more td { color: var(–muted); text-align: center; font-size: 10.5px; padding: 7px; }
+
+#output { display: block; }
+</style>
+
+</head>
+<body>
+
+<div class="input-block">
+  <textarea id="payload" rows="2" placeholder="Enter any UTF-8 text…"></textarea>
+  <div class="controls">
+    <div class="seed-pill">
+      <span>seed</span>
+      <input type="number" id="seed" value="0.085" step="0.001">
+    </div>
+    <button onclick="run()">Run</button>
+  </div>
+</div>
+
+<div id="banner" class="banner">
+  <div class="dot"></div>
+  <div>
+    <div class="banner-main" id="bm"></div>
+    <div class="banner-path" id="bp"></div>
+  </div>
+</div>
+
+<div id="output">
+  <div class="cards">
+    <div class="card">
+      <div class="stat"><span class="sk">payload bits</span><span class="sv" id="s-bits"></span></div>
+      <div class="stat"><span class="sk">orbit steps N</span><span class="sv" id="s-N"></span></div>
+      <div class="stat"><span class="sk">zero events</span><span class="sv c-blue" id="s-ze"></span></div>
+      <div class="stat"><span class="sk">seed H[0]</span><span class="sv c-blue" id="s-seed"></span></div>
+      <div class="stat"><span class="sk">digest H[N]</span><span class="sv c-blue" id="s-digest"></span></div>
+    </div>
+    <div class="card">
+      <div class="stat"><span class="sk">J +1</span><span class="sv c-green" id="s-jp"></span></div>
+      <div class="stat"><span class="sk">J −1</span><span class="sv c-red" id="s-jn"></span></div>
+      <div class="stat"><span class="sk">J 0 (injection)</span><span class="sv c-blue" id="s-jz"></span></div>
+      <div class="stat"><span class="sk">error bits (±1) / payload</span><span class="sv" id="s-eratio"></span></div>
+      <div class="stat"><span class="sk">recovered seed</span><span class="sv" id="s-rec"></span></div>
+      <div class="stat"><span class="sk">bits recovered</span><span class="sv" id="s-brc"></span></div>
+    </div>
+  </div>
+
+  <div class="vis-card">
+    <div class="vis-label">orbit — blue = injection point (bit 1 solid, bit 0 faint)</div>
+    <div class="bitvis" id="bitvis"></div>
+  </div>
+
+  <div class="tbl-card">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>n</th><th>J[n]</th><th>F[n]</th><th>injected bit</th><th>H[n]</th></tr></thead>
+        <tbody id="fb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tbl-card">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>n</th><th>F[n]</th><th>H[n] anchor</th><th>J[n]</th><th>recovered H[n−1]</th><th>recovered bit</th><th>Δ</th></tr></thead>
+        <tbody id="ib"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const CS = 1.094, DL = 0.002;
+
+function tr14(x) {
+  const f = 1e14, r = parseFloat(x.toFixed(14));
+  return r >= 0 ? Math.floor(r*f)/f : Math.ceil(r*f)/f;
+}
+function sgn(x) { return x>0?1:x<0?-1:0; }
+
+function payloadBits(text) {
+  const bytes = new TextEncoder().encode(text), bits = [];
+  for (const b of bytes) for (let i=7;i>=0;i--) bits.push((b>>i)&1);
+  return bits;
+}
+
+function computeJ(h1, h2, F) {
+  const inn = h1 + F;
+  if (inn >= 0) {
+    const v2 = F - Math.sqrt(inn);
+    if (v2 >= 0) return sgn(tr14(Math.sqrt(v2)) - h2);
+  }
+  return sgn(h1 - h2);
+}
+
+function encode(text, seed) {
+  const bSeq = payloadBits(text);
+  let bitIdx = 0;
+  const H = [seed], J = [null], F_seq = [null];
+
+  while (bitIdx < bSeq.length) {
+    const n = H.length - 1 + 1; // next index
+    const h1 = H[H.length-1];
+    const h2 = H.length >= 2 ? H[H.length-2] : seed;
+    const j = computeJ(h1, h2, CS);
+
+    let Fn;
+    if (j === 0) {
+      Fn = CS + bSeq[bitIdx] * DL;
+      bitIdx++;
+    } else {
+      Fn = CS;
+    }
+
+    const v = h1*h1 - Fn;
+    H.push(tr14(v*v - Fn));
+    J.push(j);
+    F_seq.push(Fn);
+  }
+
+  return { H, J, F_seq, N: H.length-1, bSeq };
+}
+
+function invert(H, J, F_seq, N) {
+  const steps = [];
+  for (let n = N; n >= 1; n--) {
+    const Fp = F_seq[n], anc = H[n];
+    const k   = tr14(Math.sqrt(Fp - Math.sqrt(anc + Fp)));
+    // at n=1 (terminal step), k recovers seed directly — J[1] was computed
+    // against h2=seed=h1 (hanging convention) so correction does not apply
+    const rec = n === 1 ? k : tr14(k - J[n] * 1e-14);
+    let bit = null;
+    if (J[n] === 0) bit = Math.abs(Fp - (CS + DL)) < 1e-10 ? 1 : 0;
+    steps.push({ n, Fp, anc, Jn: J[n], rec, exp: H[n-1], delta: rec - H[n-1], bit });
+  }
+  return steps;
+}
+
+function fmt(x)  { return x.toFixed(14); }
+function jc(v)   { return v===1?'jp-t':v===-1?'jn-t':'jz-t'; }
+function jl(v)   { return v===1?'+1':v===-1?'−1':'0'; }
+function fmtD(d) {
+  const ok = Math.abs(d) <= 2e-14;
+  const s  = Math.abs(d) < 1e-17 ? '0.00e+00' : d.toExponential(2);
+  return `<span style="color:${ok?'var(--green)':'var(--red)'}">${s}</span>`;
+}
+
+function run() {
+  const text = document.getElementById('payload').value.trim();
+  const seed = parseFloat(document.getElementById('seed').value);
+  if (!text) return;
+
+  const { H, J, F_seq, N, bSeq } = encode(text, seed);
+  const digest = H[N];
+  const steps  = invert(H, J, F_seq, N);
+  const recSeed = steps[steps.length-1].rec;
+  const residual = Math.abs(recSeed - seed);
+  const ok = residual < 1e-13;
+
+  // recovered bits (reversed from steps)
+  const recBits = steps.filter(s=>s.bit!==null).map(s=>s.bit).reverse();
+  const bitsOk  = recBits.length === bSeq.length && recBits.every((b,i)=>b===bSeq[i]);
+
+  // banner
+  const banner = document.getElementById('banner');
+  banner.className = 'banner show ' + (ok&&bitsOk ? 'ok' : 'fail');
+  document.getElementById('bm').textContent = ok&&bitsOk
+    ? 'Round trip closed — seed and all bits recovered'
+    : 'Round trip failed';
+  document.getElementById('bp').textContent =
+    `H[0] = ${fmt(seed)}  →  H[${N}] = ${fmt(digest)}  →  recovered = ${fmt(recSeed)}`;
+
+  document.getElementById('output').style.display = 'block';
+
+  const ze = J.slice(1).filter(v=>v===0).length;
+  document.getElementById('s-bits').textContent   = bSeq.length;
+  document.getElementById('s-N').textContent      = N;
+  document.getElementById('s-ze').textContent     = ze;
+  document.getElementById('s-seed').textContent   = fmt(seed);
+  document.getElementById('s-digest').textContent = fmt(digest);
+
+  const jv = J.slice(1);
+  const jpos = jv.filter(v=>v===1).length;
+  const jneg = jv.filter(v=>v===-1).length;
+  document.getElementById('s-jp').textContent = jpos;
+  document.getElementById('s-jn').textContent = jneg;
+  document.getElementById('s-jz').textContent = ze;
+  const errBits = jpos + jneg;
+  document.getElementById('s-eratio').textContent =
+    `${errBits} / ${bSeq.length}  (${(errBits/bSeq.length*100).toFixed(1)}%)`;
+
+  const re = document.getElementById('s-rec');
+  re.textContent = fmt(recSeed); re.className = 'sv '+(ok?'c-green':'c-red');
+  const br = document.getElementById('s-brc');
+  br.textContent = `${recBits.length}/${bSeq.length} ${bitsOk?'✓':'✗'}`;
+  br.className = 'sv '+(bitsOk?'c-green':'c-red');
+
+  // bit visualisation
+  const bv = document.getElementById('bitvis'); bv.innerHTML = '';
+  for (let n=1; n<=Math.min(N,600); n++) {
+    const d = document.createElement('div');
+    if (J[n] === 0) {
+      // injection point — colour by bit value
+      const bit = Math.abs(F_seq[n]-(CS+DL))<1e-10 ? 1 : 0;
+      d.className = 'bbit ' + (bit===1 ? 'b-inj-1' : 'b-inj-0');
+    } else {
+      d.className = 'bbit ' + (J[n]===1?'b-pos':'b-neg');
+    }
+    bv.appendChild(d);
+  }
+
+  // forward table
+  const fb = document.getElementById('fb'); fb.innerHTML = '';
+  const fl = Math.min(N, 300);
+  // row 0 — seed
+  const r0 = document.createElement('tr');
+  r0.innerHTML = `<td style="color:var(--blue);font-weight:600">0</td><td>—</td><td>—</td><td>—</td><td style="color:var(--blue);font-weight:600">${fmt(seed)}</td>`;
+  fb.appendChild(r0);
+  for (let n=1; n<=fl; n++) {
+    const isInj = J[n] === 0;
+    const bit   = isInj ? (Math.abs(F_seq[n]-(CS+DL))<1e-10?'1':'0') : '';
+    const tr    = document.createElement('tr');
+    if (isInj) tr.className = 'inject';
+    tr.innerHTML = `
+      <td>${n}</td>
+      <td class="${jc(J[n])}">${jl(J[n])}</td>
+      <td class="${isInj?(bit==='1'?'f1':'f0'):'f0'}">${F_seq[n].toFixed(4)}</td>
+      <td style="color:${isInj?'var(--blue)':'var(--muted)'};font-weight:${isInj?600:400}">${bit}</td>
+      <td>${fmt(H[n])}</td>`;
+    fb.appendChild(tr);
+  }
+  if (N > 300) {
+    const tr = document.createElement('tr'); tr.className = 'more';
+    tr.innerHTML = `<td colspan="5">… ${N-300} more steps …</td>`;
+    fb.appendChild(tr);
+  }
+
+  // inverse table
+  const ib = document.getElementById('ib'); ib.innerHTML = '';
+  for (const s of steps) {
+    const tr = document.createElement('tr');
+    if (s.Jn === 0) tr.className = 'inject';
+    const bitStr = s.bit !== null
+      ? `<span style="color:var(--blue);font-weight:600">${s.bit}</span>` : '';
+    tr.innerHTML = `
+      <td>${s.n}</td>
+      <td class="${s.Jn===0?(Math.abs(s.Fp-(CS+DL))<1e-10?'f1':'f0'):'f0'}">${s.Fp.toFixed(4)}</td>
+      <td>${fmt(s.anc)}</td>
+      <td class="${jc(s.Jn)}">${jl(s.Jn)}</td>
+      <td>${fmt(s.rec)}</td>
+      <td>${bitStr}</td>
+      <td>${fmtD(s.delta)}</td>`;
+    ib.appendChild(tr);
+  }
+  // row 0 — recovered seed
+  const ri0 = document.createElement('tr');
+  ri0.innerHTML = `<td style="color:var(--blue);font-weight:600">0</td><td>—</td><td>—</td><td>—</td><td style="color:${ok?'var(--green)':'var(--red)'};font-weight:600">${fmt(recSeed)}</td><td>—</td><td>${fmtD(residual * (recSeed < seed ? -1 : 1))}</td>`;
+  ib.appendChild(ri0);
+}
+
+
+</script>
+
+</body>
+</html>
