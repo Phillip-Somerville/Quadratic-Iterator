@@ -16,7 +16,19 @@ The attractor basin is stable across all valid seeds. All downstream properties 
 
 ## PRECISION DISCIPLINE
 
-All intermediate arithmetic runs at full IEEE 754 float64 precision. A `trunc_round` operation is applied only at the output of each forward step and at the output of each inverse interrogation:
+All intermediate arithmetic runs at full IEEE 754 float64 precision. A `trunc_round` operation is applied only at the output of each forward step and at the output of each inverse interrogation.
+
+### JavaScript implementation
+
+```javascript
+function tr14(x) {
+  return Math.round(x * 1e14) / 1e14;
+}
+```
+
+**Critical:** `Math.round(x * 1e14) / 1e14` must be used. Do NOT use `parseFloat(x.toFixed(14))` — the string→float round-trip carries unpurged sub-14dp precision residuals across iterations, compounding to multi-ULP errors that scale with orbit length. `Math.round` stays entirely in float64 arithmetic and produces the nearest float64 to the true 14dp grid point with no leakage.
+
+### Python implementation
 
 ```python
 def trunc_round(x, dp=14):
@@ -37,7 +49,7 @@ The payload is expanded to a bit sequence by encoding each codepoint big-endian,
 
 ```
 bSeq = payload_bits + [0, 0]
-N    = len(bSeq)          # total steps = 8 * len(payload) + 2
+N    = len(bSeq)          # total steps = 8 * len(payload_bytes) + 2
 ```
 
 The closing zeros ensure the digest always lands in a known terminal band.
@@ -188,8 +200,21 @@ Four canonical fingerprints are defined per payload by transforming the bit stre
 
 These four channels encode structural relationships in the payload:
 
-- **Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes. Both channels collapse to the same band.
-- **Rhyme detection:** `distance(p1, p2) < 1e-10` for phonetically rhyming pairs across any channel combination.
+- **Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes.
+- **Rhyme detection:** `distance(p1, p2) < 1e-10` for phonetically rhyming pairs.
+
+### Quad Channel Asymptotic Boundaries
+
+The four quad channels produce digests within discrete non-overlapping bands, derived from 256-input digest harvest with 10% gap buffer applied:
+
+|Channel          |Band min|Band max|
+|-----------------|--------|--------|
+|w (lower lateral)|0.08639 |0.08654 |
+|x (lower medial) |0.08686 |0.08688 |
+|y (upper medial) |0.08874 |0.08889 |
+|z (upper lateral)|0.08921 |0.08923 |
+
+Gaps between bands: w→x ≈ 2.69e-4, x→y ≈ 1.81e-3, y→z ≈ 2.70e-4. These boundaries are stable and seed-independent. The canonical seed 0.085 lands in band w (lowest quad channel).
 
 -----
 
@@ -209,8 +234,6 @@ The attractor basin divides into eight discrete bands determined by the terminal
 |8   |(0, 1)       |alternation to 1|Upper|1|1|
 
 ### B and C Recovery
-
-Given a digest value, B and C are recovered without any stored overhead:
 
 ```python
 BAND_BOUNDARIES = [
@@ -236,8 +259,6 @@ def band_bc(band):
     return B, C
 ```
 
-Boundaries are hardcoded with a 10% gap buffer to prevent out-of-range errors.
-
 -----
 
 ## MUSICAL ENCODING
@@ -258,7 +279,7 @@ Example — D-flat major opening of Clair de Lune: `AbAbAbFEbDb`
 
 |Parameter|Value|Description                                   |
 |---------|-----|----------------------------------------------|
-|C_STATIC |1.094|F value for bit 0                             |
+|C_STATIC |1.094|F value for bit 0 (base iteration parameter)  |
 |DELTA    |0.002|F increment for bit 1, giving F = 1.096       |
 |PREC     |14   |Decimal places for trunc_round                |
 |seed     |0.085|Canonical nonce (any value in attractor basin)|
