@@ -41,7 +41,7 @@ def tr14(x, dp=14):
 
 ### Cross-Platform Note
 
-Floating-point implementations across platforms and languages may produce differing real-number sequences for the same payload and seed. However, any implementation operating within IEEE 754 double-precision compliance will produce coherent and fully invertible precision streams — round-trip closure (seed recovery and bit recovery) is guaranteed within that implementation. Cross-platform digest agreement is not assumed; intra-platform congruency is what matters.
+Floating-point implementations across platforms and languages may produce differing real-number sequences for the same payload and seed. However, any implementation operating within IEEE 754 double-precision compliance will produce coherent and fully invertible precision streams — round-trip closure (seed recovery and bit recovery) is guaranteed within that implementation. Cross-platform digest agreement is not assumed; intra-platform fidelity is assumed.
 
 -----
 
