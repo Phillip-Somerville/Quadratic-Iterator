@@ -2,23 +2,23 @@
 
 **f(x) = (x² − F)² − F**
 
-A content-addressed digest and ternary control-stream generator for arbitrary UTF-8 payloads. The map is bijective within its attractor basin. The J-stream is produced as a byproduct of forward iteration and is provably ternary without epsilon guards. Chained inversion is exact to 14 decimal places, with J-stream symbols serving as per-step chain integrity corrections.
+A content-addressed digest and ternary control-stream generator for arbitrary UTF-8 payloads. The map is bijective within its attractor basin. The J-stream is produced as a byproduct of forward iteration and is provably ternary without epsilon guards. Chained inversion reconstructs the full payload and seed from digest + |J| stream alone, without access to stored orbit values, parameter sequences, or signed J.
 
 -----
 
 ## WHAT IT IS
 
-The iterator applies a quartic map over a bit-expanded payload, modulating the parameter F per bit. The terminal orbit value is the digest. A ternary stream — the J-stream — is emitted simultaneously, encoding the ±1 ULP residual at each inversion step.
+The iterator applies a quartic map over a payload, modulating the parameter F at each step via a zero-event detection scheme. The terminal orbit value is the digest. A ternary stream — the J-stream — is emitted simultaneously. Its absolute values |J| encode target/control step classification; its signs are reconstructed during inversion from the chained register path.
 
-The attractor basin is stable across all valid seeds. All downstream properties (digest, J-stream statistics, band position) converge to seed-independent values under the D* fixed-point map.
+The attractor basin is stable across all valid seeds. The register of each orbit value (upper/lower relative to the threshold T) is determined by which parameter F produced it, and this relationship is preserved exactly throughout expansion and inversion.
 
 -----
 
 ## PRECISION DISCIPLINE
 
-All intermediate arithmetic runs at full IEEE 754 float64 precision. A `trunc_round` operation is applied only at the output of each forward step and at the output of each inverse interrogation.
+All intermediate arithmetic runs at full IEEE 754 float64 precision. A `tr14` operation is applied only at the output of each forward step and at the output of each inverse interrogation.
 
-### JavaScript implementation
+### JavaScript
 
 ```javascript
 function tr14(x) {
@@ -26,295 +26,236 @@ function tr14(x) {
 }
 ```
 
-**Critical:** `Math.round(x * 1e14) / 1e14` must be used. Do NOT use `parseFloat(x.toFixed(14))` — the string→float round-trip carries unpurged sub-14dp precision residuals across iterations, compounding to multi-ULP errors that scale with orbit length. `Math.round` stays entirely in float64 arithmetic and produces the nearest float64 to the true 14dp grid point with no leakage.
+**Critical:** `Math.round(x * 1e14) / 1e14` must be used. Do NOT use `parseFloat(x.toFixed(14))` — the string→float round-trip carries unpurged sub-14dp residuals across iterations, compounding to multi-ULP errors that scale with orbit length. `Math.round` stays entirely in float64 arithmetic and produces the nearest float64 to the true 14dp grid point with no leakage.
 
-### Python implementation
+### Python
 
 ```python
-def trunc_round(x, dp=14):
-    r = round(x, dp)
+def tr14(x, dp=14):
     f = 10**dp
-    return math.floor(r * f) / f if r >= 0 else math.ceil(r * f) / f
+    r = round(x * f)
+    return r / f
 ```
 
-This is not cosmetic formatting. `trunc_round` defines the discrete orbit space — the 14dp grid. Without it there is no well-defined J signal, no bijection, and no recoverable chain. Every iterate must live on this grid. The forward and inverse paths apply `trunc_round` at identical precision; this is what bounds the inversion residual and makes the ternary guarantee possible.
+`tr14` defines the discrete orbit space — the 14dp lattice. Without it there is no well-defined J signal, no bijection, and no recoverable chain. Every iterate must live on this lattice.
+
+### Cross-Platform Note
+
+Floating-point implementations across platforms and languages may produce differing real-number sequences for the same payload and seed. However, any implementation operating within IEEE 754 double-precision compliance will produce coherent and fully invertible precision streams — round-trip closure (seed recovery and bit recovery) is guaranteed within that implementation. Cross-platform digest agreement is not assumed; intra-platform congruency is what matters.
 
 -----
 
 ## FORWARD CONSTRUCTION
 
-### Bit Expansion
+### Seed
 
-The payload is expanded to a bit sequence by encoding each codepoint big-endian, byte by byte. Two closing zero-bits are appended to every payload:
+H[0] = seed is the nonce. The canonical seed is **0.087801** — the midpoint of the x→y band gap, which ensures symmetric register splitting from initialisation.
 
-```
-bSeq = payload_bits + [0, 0]
-N    = len(bSeq)          # total steps = 8 * len(payload_bytes) + 2
-```
+### Encoding Architecture
 
-The closing zeros ensure the digest always lands in a known terminal band.
-
-### F-Sequence
-
-Each bit selects a parameter value:
+Expansion proceeds step by step. At each step, the iterator interrogates the current orbit value to determine whether the step is a **target** (J=0, consumes a payload bit) or a **control** (J≠0, applies a ULP correction):
 
 ```
-F[n] = 1.094            if bSeq[n] == 0
-F[n] = 1.094 + 0.002    if bSeq[n] == 1
+n=1: always target — no J interrogation, consume first payload bit
+n≥2: interrogate H[n-1] under its register parameter
+     J[n] = sgn(tr14(sqrt(F − sqrt(H[n-1] + F))) − H[n-2])
+     J[n] = 0  → target step: F = PL + bit * DELTA
+     J[n] ≠ 0  → control step: F = PL + D (if J=+1), F = PL (if J=−1)
 ```
 
-`C_STATIC = 1.094`, `DELTA = 0.002` are fixed constants.
+### Register–Parameter Correspondence
 
-### F Indexing Convention
+The parameter used at each step determines the register of the output digest — and this is guaranteed by construction:
 
-**F[n] is the parameter of the destination step — the step being written, not the step being read from.** This convention holds symmetrically in both the forward and inverse directions. At forward step n, F[n] modulates the transition that produces H[n]; at inverse step n, F[n] is the parameter used to recover H[n-1] from H[n].
+```
+F = 1.096  →  H[n] in upper register (H[n] > T)
+F = 1.094  →  H[n] in lower register (H[n] ≤ T)
+```
+
+This is the channel patency property. It holds without exception and is the foundation of derived inversion.
+
+### Control Parameter Rule
+
+At a control step (J≠0), the parameter is determined by the J sign:
+
+```
+J = +1  →  F = PL + D = 1.096
+J = −1  →  F = PL     = 1.094
+```
 
 ### H-Trace
 
-The orbit is initialised with the seed and built by applying the forward step sequentially:
-
 ```
-H[0]   = seed
-H[n]   = trunc_round((H[n-1]² − F[n])² − F[n])    n = 1..N
+H[0] = seed
+H[n] = tr14((H[n-1]² − F[n])² − F[n])    n = 1..N
 ```
 
-H[N] is the digest.
-
-Note that F[n] — the parameter of step n — modulates the transition that produces H[n] from H[n-1]. The seed H[0] is not itself the output of any iterator step; it is the hanging input that initiates the chain.
-
-### Seed
-
-H[0] = seed is the nonce. All downstream properties are seed-independent by convergence of the D* fixed-point loop. The canonical seed is **0.085**, which lands cleanly in the lowest quad channel.
+H[N] is the digest. N = total iterates (target steps + control steps). For a payload of k bytes, the number of target steps equals 8k.
 
 -----
 
 ## J-STREAM
 
-The J-stream is a ternary sequence {−1, 0, +1}, generated during forward iteration. Each symbol encodes the ±1 ULP residual at the corresponding inversion step and serves as the per-step correction for exact chained inversion.
+The J-stream is a ternary sequence {−1, 0, +1}, generated during forward expansion. |J[n]| = 0 means target (perfect inversion); |J[n]| = 1 means control (±1 ULP correction needed). The sign of J[n] is determined by the register of the digest at that step — and is therefore recoverable during inversion without being transmitted.
 
-### Inverse Interrogation
+### Interrogation Formula
 
-At step n, the iterator interrogates the principal branch inverse of H[n-1] under F[n-1]:
-
-```python
-inner = H[n-1] + F[n-1]
-val2  = F[n-1] - sqrt(inner)        # full float64
-k     = trunc_round(sqrt(val2))     # disciplined — matches forward precision
-J[n]  = sgn(k - H[n-2])
-```
-
-The interrogation at step n recovers H[n-2] to within ±1 ULP at 14dp. J[n] records the sign of that residual.
-
-When the principal branch is not reachable (inner < 0 or val2 < 0), the fallback is:
+At step n (n ≥ 2):
 
 ```
-J[n] = sgn(H[n-1] - H[n-2])
+Fp    = H[n-1] > T ? PL + D : PL
+inner = H[n-1] + Fp
+val2  = Fp − sqrt(inner)
+k     = tr14(sqrt(val2))
+J[n]  = sgn(k − H[n-2])
 ```
+
+Fallback when principal branch unreachable: `J[n] = sgn(H[n-1] − H[n-2])`
 
 ### Why J Is Provably Ternary
 
-IEEE 754 mandates that `sqrt` is correctly rounded — the result is the nearest representable float64 to the true value, within ±0.5 ULP. Because `k = trunc_round(sqrt(val2))` inverts the same squaring that produced H[n-1] from H[n-2], and both paths apply `trunc_round` at the same precision, the residual `k − H[n-2]` is bounded within ±1 ULP at 14 decimal places after discretisation. No epsilon guard is needed. The ternary outcome is a consequence of the precision contract, not a choice.
+IEEE 754 mandates correctly-rounded sqrt. Because k = tr14(sqrt(val2)) inverts the squaring that produced H[n-1] from H[n-2], and both paths apply tr14 at the same precision, the residual k − H[n-2] is bounded within ±1 ULP. No epsilon guard needed.
 
 ### Zero Events
 
-J[n] = 0 when k == H[n-2] exactly in float64 — a genuine fixed-point condition at the precision boundary. Zero rate is payload-dependent (typically 35–48%) and invariant to seed. Zero events are structurally significant closures in the orbit.
+J[n] = 0 when k == H[n-2] exactly — a genuine fixed-point closure. Zero rate is payload-dependent and invariant to seed.
+
+-----
+
+## HANGING J
+
+At the terminal position N, a signed boundary value jHang is computed:
+
+```
+Fp    = H[N] > T ? PL + D : PL    ← derived from register, NOT from stored F
+inner = H[N] + Fp
+val2  = Fp − sqrt(inner)
+k     = tr14(sqrt(val2))
+jHang = sgn(k − H[N-1])
+```
+
+jHang is signed because there is no later chained register from which its sign can be recovered during inversion. It is transmitted as a separate signed value alongside the |J| stream, not as a member of it.
+
+-----
+
+## TRANSMITTED RECORD
+
+The complete record required for chained inversion:
+
+```
+H[N]         digest (terminal orbit value)
+|J[1..N]|    unsigned ternary stream (0 or 1 per step)
+jHang        signed boundary correction ∈ {−1, 0, +1}
+N            total step count
+PL, D, T     constants (implicit if agreed)
+```
+
+**Not transmitted:** full orbit H[1..N-1], parameter stream F[1..N], signed J stream.
 
 -----
 
 ## CHAINED INVERSION
 
-### Stored Record
+Inversion reconstructs all prior orbit states and payload bits from the transmitted record alone. No stored H, no stored F, no signed J.
 
-The stored record per payload is:
+### Synchronisation Rule
 
-```
-H[0..N]   trunc_rounded orbit values (the chain anchors)
-J[1..N]   J-stream symbols (the per-step corrections)
-H[N]      digest (terminal orbit value)
-```
+At inversion step i (counting up from terminal digest toward seed, n = N−i+1):
 
-### Inverse Step
+- **Parameter** (immediate): `Fp = anchor > T ? PL+D : PL` — from register of current anchor
+- **Correction** (one step delayed): uses `|J[n+1]|` and sign from register of previous anchor
+- **Target detection**: uses `|J[n]|` — the current stream position
 
-Given H[n] and F[n], the inverse step recovers H[n-1]:
+This offset is fundamental: J[n] describes the interrogation of H[n-1] (not H[n]), so the correction for inverting H[n] is encoded in J[n+1].
 
-```python
-inner  = H[n] + F[n]
-val2   = F[n] - sqrt(inner)
-k      = trunc_round(sqrt(val2))
-H[n-1] = trunc_round(k - J[n] * 1e-14)
-```
-
-F[n] is the parameter of step n — consistent with the convention that F belongs to the destination step, which in the inverse direction is the step being recovered.
-
-### Chain Integrity
-
-The stored H values are the chain anchors. At each inverse step, H[n] is read directly from the stored record — not carried from the previous inversion result. This prevents error accumulation: the inverse of a chaotic map is itself chaotic, and ±1 ULP error in the input compounds exponentially across steps.
-
-J[n] provides the per-step correction: it adjusts the trunc_rounded inverse result by exactly ±1 ULP to recover H[n-1] on the exact 14dp grid. Without J, residuals compound and the chain diverges within a few steps. With J applied at each step from the stored anchor, the chain is exact throughout.
-
-### Hanging Value Recovery
-
-The chain terminates at n=1. Inverting H[1] under F[1] with J[1] recovers H[0] = seed exactly. This closes the bijection: the seed is both the hanging input that initiates the forward chain and the exact terminal output of the inverse chain.
-
------
-
-## D* FIXED POINT
-
-For any payload there exists a unique D* satisfying:
+### Inversion Algorithm
 
 ```
-encode(payload, D*).digest == D*
+anchor     = H[N]            ← start from digest
+prevAnchor = H[N]            ← initialise previous for sign pipeline
+
+# Capture first target bit if |J[N]| = 0
+if |J[N]| == 0: emit bit = (anchor > T ? 1 : 0)
+
+# Step i=1: static, apply signed jHang
+Fp  = anchor > T ? PL+D : PL
+k   = tr14(sqrt(Fp − sqrt(anchor + Fp)))
+rec = jHang == 0 ? k : tr14(k − jHang * 1e-14)
+prevAnchor = anchor; anchor = rec
+
+# Steps i=2..N:
+for i = 2 to N:
+  n           = N − i + 1
+  upper       = anchor > T
+  Fp          = upper ? PL+D : PL
+  k           = tr14(sqrt(Fp − sqrt(anchor + Fp)))
+  jAbsCorr    = |J[n+1]|                    ← correction indicator
+  jAbsThis    = |J[n]|                      ← target/bit indicator
+  prevUpper   = prevAnchor > T
+  jSgn        = jAbsCorr == 0 ? 0 : (prevUpper ? 1 : -1)
+  rec         = jAbsCorr == 0 ? k : tr14(k − jSgn * 1e-14)
+  if jAbsThis == 0: emit bit = (upper ? 1 : 0)
+  prevAnchor  = anchor; anchor = rec
+
+seed = anchor    ← final anchor is recovered seed
 ```
 
-D* is found by iterating the digest map from any seed; convergence is guaranteed in ≤ 2 loops. It is seed-independent and serves as the canonical payload fingerprint.
+Bits emitted in reverse order — reverse to recover payload.
 
-```python
-def d_star(payload):
-    seed = 0.085
-    for _ in range(6):
-        d = encode(payload, seed).digest
-        if abs(d - seed) < 1e-15:
-            break
-        seed = d
-    return d
-```
+### ULP Direction
 
-D* distance between two payloads satisfies identity, symmetry, and triangle inequality:
+The ULP correction direction on inversion is determined by the register of the **previous** anchor (H[n+1] in expansion terms):
 
 ```
-distance(p1, p2) = |d_star(p1) − d_star(p2)|
+prevAnchor upper  →  jSgn = +1  →  rec = tr14(k − 1e-14)
+prevAnchor lower  →  jSgn = −1  →  rec = tr14(k + 1e-14)
 ```
 
------
-
-## QUAD CHANNEL
-
-Four canonical fingerprints are defined per payload by transforming the bit stream before encoding:
-
-|Channel|Transformation               |
-|-------|-----------------------------|
-|forward|payload bits                 |
-|reverse|reversed payload bits        |
-|comp   |bitwise complement of forward|
-|revcomp|bitwise complement of reverse|
-
-These four channels encode structural relationships in the payload:
-
-- **Palindrome identity:** `|D*_forward − D*_reverse| = 0` exactly for palindromes.
-- **Rhyme detection:** `distance(p1, p2) < 1e-10` for phonetically rhyming pairs.
-
-### Quad Channel Asymptotic Boundaries
-
-The four quad channels produce digests within discrete non-overlapping bands, derived from 256-input digest harvest with 10% gap buffer applied:
-
-|Channel          |Band min|Band max|
-|-----------------|--------|--------|
-|w (lower lateral)|0.08639 |0.08654 |
-|x (lower medial) |0.08686 |0.08688 |
-|y (upper medial) |0.08874 |0.08889 |
-|z (upper lateral)|0.08921 |0.08923 |
-
-Gaps between bands: w→x ≈ 2.69e-4, x→y ≈ 1.81e-3, y→z ≈ 2.70e-4. These boundaries are stable and seed-independent. The canonical seed 0.085 lands in band w (lowest quad channel).
-
------
-
-## BAND STRUCTURE
-
-The attractor basin divides into eight discrete bands determined by the terminal two-bit pattern of the payload (the two bits immediately preceding the closing zeros). Bands are non-overlapping, separated by gaps of ≥ 4.9e-5.
-
-|Band|Terminal bits|Transition type |Half |B|C|
-|----|-------------|----------------|-----|-|-|
-|1   |(1, 0)       |alternation to 0|Lower|0|0|
-|2   |(0, 0)       |consecutive 0s  |Lower|0|0|
-|3   |(1, 1)       |consecutive 1s  |Lower|0|1|
-|4   |(0, 1)       |alternation to 1|Lower|0|1|
-|5   |(1, 0)       |alternation to 0|Upper|1|0|
-|6   |(0, 0)       |consecutive 0s  |Upper|1|0|
-|7   |(1, 1)       |consecutive 1s  |Upper|1|1|
-|8   |(0, 1)       |alternation to 1|Upper|1|1|
-
-### B and C Recovery
-
-```python
-BAND_BOUNDARIES = [
-    (0.08636316488056, 0.08645049942242),
-    (0.08648981066002, 0.08657545468422),
-    (0.08669545053069, 0.08678420037717),
-    (0.08682443149389, 0.08691142795026),
-    (0.08781118962651, 0.08790084886874),
-    (0.08794169894719, 0.08802964069811),
-    (0.08815360499332, 0.08824478706384),
-    (0.08828655569850, 0.08837595523818),
-]
-
-def digest_band(digest):
-    for i, (lo, hi) in enumerate(BAND_BOUNDARIES):
-        if lo <= digest <= hi:
-            return i + 1
-    return 0  # in gap — should not occur for valid digests
-
-def band_bc(band):
-    B = 0 if band <= 4 else 1
-    C = 0 if (band - 1) % 4 < 2 else 1
-    return B, C
-```
-
------
-
-## MUSICAL ENCODING
-
-Notes are encoded as concatenated name strings with no separators.
-
-|Type    |Encoding            |
-|--------|--------------------|
-|Naturals|C D E F G A B       |
-|Flats   |Cb Db Eb Fb Gb Ab Bb|
-|Sharps  |Cs Ds Es Fs Gs As Bs|
-
-Example — D-flat major opening of Clair de Lune: `AbAbAbFEbDb`
+This is derived from the channel patency property: upper register was produced by F=1.096, lower by F=1.094, and inversion residuals are consistently signed by F. The previous anchor’s register is available one step ahead of application — the one-step synchronisation offset.
 
 -----
 
 ## PARAMETERS
 
-|Parameter|Value|Description                                   |
-|---------|-----|----------------------------------------------|
-|C_STATIC |1.094|F value for bit 0 (base iteration parameter)  |
-|DELTA    |0.002|F increment for bit 1, giving F = 1.096       |
-|PREC     |14   |Decimal places for trunc_round                |
-|seed     |0.085|Canonical nonce (any value in attractor basin)|
+|Parameter|Value   |Description                                   |
+|---------|--------|----------------------------------------------|
+|PL       |1.094   |Base iteration parameter (bit 0, control −1)  |
+|D        |0.002   |Delta — PL+D = 1.096 (bit 1, control +1)      |
+|T        |0.08781 |Threshold — midpoint of x→y band gap          |
+|seed     |0.087801|Canonical nonce — symmetric register splitting|
+|PREC     |14      |Decimal places for tr14                       |
+
+-----
+
+## BAND STRUCTURE
+
+The attractor basin divides into four quad channels (w, x, y, z) separated by gaps. Upper/lower register split at T = 0.08781 — the midpoint of the x→y gap, which is never visited by any valid orbit.
+
+|Band|Register|Type   |
+|----|--------|-------|
+|w   |Lower   |Lateral|
+|x   |Lower   |Medial |
+|y   |Upper   |Medial |
+|z   |Upper   |Lateral|
+
+Overlap of any two adjacent bands indicates threshold misplacement. Verified clean across all tested payloads.
 
 -----
 
 ## SELF-TEST
 
-```
-python iterator_canonical.py
-```
+Run any payload through encode then invert. Verify:
 
-Expected output:
+1. `recSeed == seed` (exact, within 1e-13)
+1. `recBits == bSeq` (all bits recovered)
+1. Zero drift at every inversion step
+1. Band overlap alerts: none
 
-```
-Canonical iterator — self-test
+Example — “O frabjous day! Callooh! Callay!” with seed 0.087801:
 
-Payload : 'the rain in Spain falls mainly on the plain'
-D*      : 0.08641728517128
-Closes  : True
-
-J-stream N=346  -1:102  0:132  +1:112
-Ternary  : PASS
-
-Rhyme detection:
-rain/Spain: 0.000000e+00  rhyme
-rain/plain: 0.000000e+00  rhyme
-cat/rat:    6.018000e-11  rhyme
-cat/dog:    2.015007e-04
-
-Palindrome |D*_forward − D*_reverse|:
-racecar: 0.000000e+00
-level:   0.000000e+00
-madam:   0.000000e+00
-```
+- 256 target bits, ~680 total iterates
+- 256/256 bits recovered
+- Seed exact
 
 -----
 
