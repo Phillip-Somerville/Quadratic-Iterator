@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bijective Quadratic Iterator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=New+York:opsz,wght@6,400;6,500&display=swap');
+  :root {
+    --bg:#f2f2f7; --surface:rgba(255,255,255,0.72); --border:rgba(0,0,0,0.08);
+    --border2:rgba(0,0,0,0.05); --text:#1c1c1e; --muted:#8e8e93;
+    --blue:#007aff; --green:#34c759; --red:#ff3b30;
+    --mono:'JetBrains Mono',monospace; --serif:'New York','Georgia',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12.5px;min-height:100vh;padding:48px 40px;-webkit-font-smoothing:antialiased;}
+  .input-block{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:16px;padding:28px 28px 24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 8px 24px rgba(0,0,0,0.04);}
+  textarea{width:100%;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--serif);font-size:17px;line-height:1.55;padding:14px 16px;resize:vertical;min-height:72px;outline:none;transition:border-color .15s,box-shadow .15s;margin-bottom:16px;}
+  textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.12);}
+  .controls{display:flex;align-items:center;gap:12px;}
+  .seed-wrap{display:flex;align-items:center;gap:8px;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+  .seed-label{color:var(--muted);font-size:11px;}
+  input[type=number]{background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:12.5px;width:110px;outline:none;}
+  button{margin-left:auto;background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;padding:9px 20px;cursor:pointer;transition:opacity .12s,transform .1s;}
+  button:hover{opacity:.88;}button:active{transform:scale(.97);}
+  .banner{border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px;}
+  .banner.ok{background:rgba(52,199,89,0.12);border:1px solid rgba(52,199,89,0.25);}
+  .banner.fail{background:rgba(255,59,48,0.10);border:1px solid rgba(255,59,48,0.25);}
+  .banner.hidden{display:none;}
+  .banner-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .ok .banner-dot{background:var(--green);}.fail .banner-dot{background:var(--red);}
+  .banner-main{font-family:var(--serif);font-size:15px;color:var(--text);}
+  .banner-path{color:var(--muted);font-size:11px;margin-top:3px;word-break:break-all;}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+  .card{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border2);}
+  .stat:last-child{border-bottom:none;}
+  .stat-k{color:var(--muted);font-size:11px;}.stat-v{font-weight:600;font-size:12px;}
+  .c-blue{color:var(--blue);}.c-green{color:var(--green);}.c-red{color:var(--red);}.c-muted{color:var(--muted);}
+  .jvis-wrap{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .jvis{display:flex;flex-wrap:wrap;gap:2px;margin-top:10px;max-height:72px;overflow:hidden;}
+  .jbit{width:7px;height:7px;border-radius:1px;flex-shrink:0;}
+  .jctl-p{background:#ff3b30;}.jctl-n{background:#ffaaaa;}.jtgt-1{background:#000;}.jtgt-0{background:#555;}
+  .tbl-wrap{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .tbl-scroll{max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,0.1) transparent;}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{color:var(--muted);font-size:10px;letter-spacing:.8px;text-transform:uppercase;text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(242,242,247,0.9);backdrop-filter:blur(8px);font-weight:500;}
+  td{padding:5px 14px;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid var(--border2);}
+  tr:last-child td{border-bottom:none;}tr:hover td{background:rgba(0,0,0,0.02);}
+  tr.target td{background:rgba(0,122,255,0.04);}tr.target td:first-child{border-left:2px solid var(--blue);}
+  .hidden{display:none;}
+  .cp{color:var(--green);font-weight:600;}.cn{color:var(--red);font-weight:600;}.ct{color:var(--blue);font-weight:600;}
+  .up{color:var(--blue);}.lo{color:var(--muted);}
+  .more-row td{color:var(--muted);text-align:center;padding:8px;font-size:11px;}
+</style>
+</head>
+<body>
+
+<div class="input-block">
+  <textarea id="payload" rows="2" placeholder="Enter any UTF-8 text…"></textarea>
+  <div class="controls">
+    <div class="seed-wrap"><span class="seed-label">seed</span><input type="number" id="seed" value="0.087801" step="0.000001"></div>
+    <button onclick="run()">Run</button>
+  </div>
+</div>
+
+<div id="banner" class="banner hidden">
+  <div class="banner-dot"></div>
+  <div>
+    <div class="banner-main" id="banner-main"></div>
+    <div class="banner-path" id="banner-path"></div>
+  </div>
+</div>
+
+<div id="output" class="hidden">
+  <div class="cards">
+    <div class="card">
+      <div class="stat"><span class="stat-k">target bits</span><span class="stat-v" id="s-bits"></span></div>
+      <div class="stat"><span class="stat-k">total iterates</span><span class="stat-v" id="s-N"></span></div>
+      <div class="stat"><span class="stat-k">seed H[0]</span><span class="stat-v c-blue" id="s-seed"></span></div>
+      <div class="stat"><span class="stat-k">digest H[N]</span><span class="stat-v c-blue" id="s-digest"></span></div>
+      <div class="stat"><span class="stat-k">J hang</span><span class="stat-v" id="s-jhang"></span></div>
+    </div>
+    <div class="card">
+      <div class="stat"><span class="stat-k">|j| 1 (control)</span><span class="stat-v c-green" id="s-jctl"></span></div>
+      <div class="stat"><span class="stat-k">|j| 0 (target)</span><span class="stat-v c-blue" id="s-jtgt"></span></div>
+      <div class="stat"><span class="stat-k">J +1 / −1</span><span class="stat-v" id="s-jpm"></span></div>
+      <div class="stat"><span class="stat-k">recovered seed</span><span class="stat-v" id="s-rec"></span></div>
+      <div class="stat"><span class="stat-k">bits recovered</span><span class="stat-v" id="s-brc"></span></div>
+    </div>
+  </div>
+  <div class="jvis-wrap"><div class="jvis" id="jvis"></div></div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>n</th><th>J[n]</th><th>reg</th><th>F[n]</th><th>H[n]</th><th style="width:18px;text-align:right">bit</th></tr></thead>
+        <tbody id="fwd-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>i</th><th>reg</th><th>|j|</th><th>k</th><th>corrective</th><th>H[n+1]</th><th style="width:18px;text-align:right">bit</th></tr></thead>
+        <tbody id="inv-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const PL = 1.094;   // PARAM_LOW
+const D  = 0.002;   // DELTA — PARAM_HIGH = PL + D = 1.096
+const T  = 0.08781; // THRESHOLD — midpoint of x→y band gap
+
+function tr14(x) { return Math.round(x * 1e14) / 1e14; }
+function sgn(x)  { return x > 0 ? 1 : x < 0 ? -1 : 0; }
+function reg(h)  { return h > T ? 'upper' : 'lower'; }
+function fmt(x)  { return x.toFixed(14); }
+
+function payloadBits(text) {
+  const bits = [];
+  for (const b of new TextEncoder().encode(text))
+    for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  return bits;
+}
+
+// ── Forward encoding ──────────────────────────────────────────────────────
+// H[n+1] = tr14((H[n]² − F)² − F)
+// J[n]   = sgn(k(H[n-1]) − H[n-2])  where k inverts H[n-1] under its register param
+// J=0  → target: F = PL + bit*D
+// J=+1 → control: F = PL + D (1.096)
+// J=−1 → control: F = PL     (1.094)
+// n=1: always target (no h2 yet), no J interrogation
+
+function encode(text, seed) {
+  const bSeq = payloadBits(text);
+  let bi = 0;
+
+  const H = [seed], J = [null], F = [null], bits = [];
+
+  // n=1: target, no interrogation
+  {
+    const h = H[0];
+    const fn = PL + bSeq[bi++] * D;
+    const v = h * h - fn;
+    H.push(tr14(v * v - fn));
+    J.push(0);
+    F.push(fn);
+    bits.push(fn === PL ? 0 : 1);
+  }
+
+  // n≥2: interrogate then expand
+  while (bi < bSeq.length) {
+    const h1 = H[H.length - 1];
+    const h2 = H[H.length - 2];
+    const Fp = h1 > T ? PL + D : PL;
+
+    // J interrogation
+    const inn = h1 + Fp;
+    let j = 0;
+    if (inn >= 0) {
+      const v2 = Fp - Math.sqrt(inn);
+      j = v2 >= 0 ? sgn(tr14(Math.sqrt(v2)) - h2) : sgn(h1 - h2);
+    } else {
+      j = sgn(h1 - h2);
+    }
+
+    let fn, bit = null;
+    if (j === 0) {
+      // Target: consume payload bit
+      bit = bSeq[bi++];
+      fn = PL + bit * D;
+    } else {
+      // Control: J sign determines parameter
+      fn = j === 1 ? PL + D : PL;
+    }
+
+    const v = h1 * h1 - fn;
+    H.push(tr14(v * v - fn));
+    J.push(j);
+    F.push(fn);
+    bits.push(bit);
+  }
+
+  const N = H.length - 1;
+
+  // Hanging J: interrogate H[N] under register-derived parameter (no stored F)
+  const h1 = H[N], h2 = H[N - 1];
+  const Fp = h1 > T ? PL + D : PL;
+  const inn = h1 + Fp;
+  let jHang = 0;
+  if (inn >= 0) {
+    const v2 = Fp - Math.sqrt(inn);
+    jHang = v2 >= 0 ? sgn(tr14(Math.sqrt(v2)) - h2) : sgn(h1 - h2);
+  } else {
+    jHang = sgn(h1 - h2);
+  }
+
+  return { H, J, F, N, bSeq, bits, jHang };
+}
+
+// ── Inversion ─────────────────────────────────────────────────────────────
+// At each step i (counting from terminal digest toward seed):
+//   1. Register of current digest → parameter for inversion
+//   2. k = tr14(sqrt(F − sqrt(current + F)))
+//   3. |j| from stream + register → reconstruct signed J → apply ±1 ULP
+//      |j|=0: perfect inversion, no correction; bit from register
+//      |j|=1: correction sign = register (upper=+1, lower=−1)
+//   4. jHang (signed) at i=1
+
+function invert(digest, absJ, jHang, total) {
+  // Chained inversion: digest + |J| stream + jHang + step count only
+  // No stored H, no stored F, no signed J
+  // At step i (n=total-i+1):
+  //   Fp   = anchor register (immediate)
+  //   |j|  = absJ[n]   = |J[n+1]| — correction indicator
+  //   sign = prevAnchor register  — H[n+1] in expansion
+  //   bit  = absJ[n-1] = |J[n]|  — target indicator, from anchor register
+
+  const absJarr = absJ;
+  const steps   = [];
+  const recBits = [];
+
+  let anchor     = digest;
+  let prevAnchor = digest; // H[N] — feeds sign at i=2
+
+  // i=1 static: invert with jHang, capture first bit if |J[N]|=0
+  {
+    const upper    = anchor > T;
+    const Fp       = upper ? PL + D : PL;
+    const k        = tr14(Math.sqrt(Fp - Math.sqrt(anchor + Fp)));
+    const rec      = jHang === 0 ? k : tr14(k - jHang * 1e-14);
+    const corr     = jHang ===  1 ? '−1e−14' : jHang === -1 ? '+1e−14' : '0';
+    const firstBit = absJarr[total - 1] === 0 ? (digest > T ? 1 : 0) : null;
+    if (firstBit !== null) recBits.push(firstBit);
+    steps.push({ i: 1, upper, Fp, jAbsThis: absJarr[total-1], jSigned: jHang, k, corrective: corr,
+                 rec, exp: null, delta: null, bit: firstBit });
+    prevAnchor = anchor;
+    anchor = rec;
+  }
+
+  // i=2..total: chained
+  for (let i = 2; i <= total; i++) {
+    const n        = total - i + 1;
+    const upper    = anchor > T;
+    const Fp       = upper ? PL + D : PL;
+    const k        = tr14(Math.sqrt(Fp - Math.sqrt(anchor + Fp)));
+    const jAbsCorr = n < absJarr.length ? absJarr[n] : 0;   // |J[n+1]| — correction
+    const jAbsThis = absJarr[n - 1];                          // |J[n]|   — target flag
+    const prevUp   = prevAnchor > T;
+    const jSgn     = jAbsCorr === 0 ? 0 : (prevUp ? 1 : -1);
+    const rec      = jAbsCorr === 0 ? k : tr14(k - jSgn * 1e-14);
+    let bit = null;
+    if (jAbsThis === 0) {
+      bit = upper ? 1 : 0;
+      recBits.push(bit);
+    }
+    const corr = jSgn ===  1 ? '−1e−14' : jSgn === -1 ? '+1e−14' : '0';
+    steps.push({ i, upper, Fp, jAbsThis, jSigned: jSgn, k, corrective: corr,
+                 rec, exp: null, delta: null, bit });
+    prevAnchor = anchor;
+    anchor = rec;
+  }
+
+  return { steps, recBits: recBits.reverse(), recSeed: anchor };
+}
+
+function run() {
+  const text = document.getElementById('payload').value.trim();
+  const seed = parseFloat(document.getElementById('seed').value);
+  if (!text) return;
+
+  const { H, J, F, N, bSeq, bits, jHang } = encode(text, seed);
+  const digest = H[N];
+  const absJ   = J.slice(1).map(v => Math.abs(v));
+
+  const absJarr = J.slice(1).map(v => Math.abs(v));
+  const { steps, recBits, recSeed } = invert(H[N], absJarr, jHang, N);
+
+  const resid  = Math.abs(recSeed - seed);
+  const ok     = resid < 1e-13;
+  const bitsOk = recBits.length === bSeq.length && recBits.every((b, i) => b === bSeq[i]);
+
+  const banner = document.getElementById('banner');
+  banner.className = 'banner ' + (ok && bitsOk ? 'ok' : 'fail');
+  document.getElementById('banner-main').textContent =
+    ok && bitsOk ? 'Round trip closed — seed and all bits recovered' : 'Round trip failed';
+  document.getElementById('banner-path').textContent =
+    `H[0]=${fmt(seed)} → H[${N}]=${fmt(digest)} → recovered=${fmt(recSeed)}`;
+
+  document.getElementById('output').classList.remove('hidden');
+  document.querySelectorAll('.tbl-scroll').forEach(el => el.scrollTop = 0);
+
+  const jv = J.slice(1);
+  document.getElementById('s-bits').textContent   = bSeq.length;
+  document.getElementById('s-N').textContent      = N;
+  document.getElementById('s-seed').textContent   = fmt(seed);
+  document.getElementById('s-digest').textContent = fmt(digest);
+
+  const jhEl = document.getElementById('s-jhang');
+  jhEl.textContent = jHang === 1 ? '+1' : jHang === -1 ? '−1' : '0';
+  jhEl.className   = 'stat-v ' + (jHang === 1 ? 'c-green' : jHang === -1 ? 'c-red' : 'c-muted');
+
+  document.getElementById('s-jctl').textContent = jv.filter(v => v !== 0).length;
+  document.getElementById('s-jtgt').textContent = jv.filter(v => v === 0).length;
+  document.getElementById('s-jpm').textContent  = `+${jv.filter(v=>v===1).length} / −${jv.filter(v=>v===-1).length}`;
+
+  const recEl = document.getElementById('s-rec');
+  recEl.textContent = fmt(recSeed);
+  recEl.className   = 'stat-v ' + (ok ? 'c-green' : 'c-red');
+  const brcEl = document.getElementById('s-brc');
+  brcEl.textContent = `${recBits.length}/${bSeq.length} ${bitsOk ? '✓' : '✗'}`;
+  brcEl.className   = 'stat-v ' + (bitsOk ? 'c-green' : 'c-red');
+
+  // Pixel visualisation
+  const jvis = document.getElementById('jvis');
+  jvis.innerHTML = '';
+  let bvi = 0;
+  for (let n = 1; n <= Math.min(N, 500); n++) {
+    const d = document.createElement('div');
+    if (J[n] === 0) {
+      d.className = 'jbit ' + (bits[n - 1] === 1 ? 'jtgt-1' : 'jtgt-0');
+    } else {
+      d.className = 'jbit ' + (J[n] === 1 ? 'jctl-p' : 'jctl-n');
+    }
+    jvis.appendChild(d);
+  }
+
+  // Forward table
+  const fb = document.getElementById('fwd-body');
+  fb.innerHTML = '';
+  const r0 = document.createElement('tr');
+  r0.innerHTML = `<td style="color:var(--blue);font-weight:600">0</td><td>—</td><td class="lo">${reg(seed)}</td><td>—</td><td style="color:var(--blue);font-weight:600">${fmt(seed)}</td><td></td>`;
+  fb.appendChild(r0);
+  for (let n = 1; n <= Math.min(N, 500); n++) {
+    const isTgt = J[n] === 0;
+    const bit   = bits[n - 1];
+    const regCls = H[n] > T ? 'up' : 'lo';
+    const jStr  = J[n] === 1 ? '<span class="cp">+1</span>' : J[n] === -1 ? '<span class="cn">−1</span>' : '<span class="ct">0</span>';
+    const tr = document.createElement('tr');
+    if (isTgt) tr.className = 'target';
+    tr.innerHTML = `<td>${n}</td><td>${jStr}</td><td class="${regCls}">${reg(H[n])}</td><td class="${regCls}">${F[n].toFixed(3)}</td><td>${fmt(H[n])}</td><td style="color:${isTgt?'var(--blue)':'var(--muted)'};font-weight:${isTgt?600:400};text-align:right">${bit !== null ? bit : ''}</td>`;
+    fb.appendChild(tr);
+  }
+  if (N > 500) {
+    const tr = document.createElement('tr'); tr.className = 'more-row';
+    tr.innerHTML = `<td colspan="6">… ${N-500} more …</td>`;
+    fb.appendChild(tr);
+  }
+
+  // Inverse table
+  const ib = document.getElementById('inv-body');
+  ib.innerHTML = '';
+  // Terminal digest row at top of inverse table
+  const rTerm = document.createElement('tr');
+  rTerm.style.background = 'rgba(0,122,255,0.06)';
+  rTerm.innerHTML = `<td style="color:var(--muted);font-size:10px">N=${steps.length}</td><td colspan="4" style="color:var(--muted);font-size:10px">terminal digest H[N]</td><td style="color:var(--blue);font-weight:700">${fmt(digest)}</td><td></td>`;
+  ib.appendChild(rTerm);
+
+  for (const s of steps.slice(0, 500)) {
+    const regCls = s.upper ? 'up' : 'lo';
+    const jStr   = s.jAbsThis === 0 ? '<span class="ct">0</span>' : '<span class="cp">1</span>';
+    const bitStr = s.bit !== null ? `<span class="ct">${s.bit}</span>` : '';
+    const corrColor = s.corrective === '0' ? 'var(--muted)' : 'var(--green)';
+    const tr = document.createElement('tr');
+    if (s.jAbsThis === 0) tr.className = 'target';
+    tr.innerHTML = `<td>${s.i}</td><td class="${regCls}">${reg(s.rec)}</td><td>${jStr}</td><td style="color:var(--muted)">${fmt(s.k)}</td><td style="color:${corrColor};font-size:10px">${s.corrective}</td><td style="color:${Math.abs(s.delta)<1e-17?'var(--green)':'var(--red)'};font-weight:600">${fmt(s.rec)}</td><td style="text-align:right">${bitStr}</td>`;
+    ib.appendChild(tr);
+  }
+  const ri = document.createElement('tr');
+  ri.innerHTML = `<td colspan="5" style="color:var(--muted)">seed recovered</td><td style="color:${ok?'var(--green)':'var(--red)'};font-weight:600">${fmt(recSeed)}</td><td>—</td>`;
+  ib.appendChild(ri);
+}
+</script>
+
+</body>
+</html>
