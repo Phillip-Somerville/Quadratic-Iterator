@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alice — Iterator Stream Database</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=New+York:opsz,wght@6,400;6,500&display=swap');
+  :root {
+    --bg:#f2f2f7; --surface:rgba(255,255,255,0.72); --border:rgba(0,0,0,0.08);
+    --border2:rgba(0,0,0,0.05); --text:#1c1c1e; --muted:#8e8e93;
+    --blue:#007aff; --green:#34c759; --red:#ff3b30; --orange:#ff9500;
+    --mono:'JetBrains Mono',monospace; --serif:'New York','Georgia',serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12.5px;min-height:100vh;padding:32px 24px;-webkit-font-smoothing:antialiased;}
+  h1{font-family:var(--serif);font-size:22px;font-weight:500;margin-bottom:6px;}
+  .subtitle{color:var(--muted);font-size:11px;margin-bottom:24px;}
+  .card{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .search-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;}
+  input[type=text]{flex:1;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:9px 12px;outline:none;transition:border-color .15s,box-shadow .15s;}
+  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.12);}
+  .mode-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .mode-btn{background:rgba(118,118,128,0.1);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:5px 11px;cursor:pointer;transition:all .12s;}
+  .mode-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  button.go{background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;padding:9px 18px;cursor:pointer;transition:opacity .12s;}
+  button.go:hover{opacity:.88;}
+  button.go:disabled{opacity:.4;cursor:default;}
+  .stat-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
+  .stat{background:rgba(118,118,128,0.06);border-radius:8px;padding:8px 12px;}
+  .stat-k{color:var(--muted);font-size:10px;display:block;}
+  .stat-v{font-weight:600;font-size:12px;}
+  .c-blue{color:var(--blue);} .c-green{color:var(--green);} .c-red{color:var(--red);} .c-orange{color:var(--orange);}
+  .tbl-wrap{border-radius:10px;overflow:hidden;border:1px solid var(--border);}
+  .tbl-scroll{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,0.1) transparent;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  th{color:var(--muted);font-size:10px;letter-spacing:.6px;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(242,242,247,0.95);backdrop-filter:blur(8px);font-weight:500;}
+  td{padding:4px 12px;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid var(--border2);}
+  tr:last-child td{border-bottom:none;} tr:hover td{background:rgba(0,0,0,0.02);}
+  tr.highlight td{background:rgba(0,122,255,0.06);}
+  tr.highlight td:first-child{border-left:2px solid var(--blue);}
+  .loading{color:var(--muted);font-size:11px;padding:12px;text-align:center;}
+  .empty{color:var(--muted);font-size:11px;padding:16px;text-align:center;}
+  .jbar{display:inline-flex;gap:1px;vertical-align:middle;}
+  .jb{width:4px;height:10px;border-radius:1px;display:inline-block;}
+  .jb-ctl{background:var(--red);opacity:.7;} .jb-tgt{background:var(--blue);opacity:.6;}
+  .section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+  .build-progress{background:rgba(0,122,255,0.08);border:1px solid rgba(0,122,255,0.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:11px;color:var(--blue);}
+  .progress-bar{height:3px;background:rgba(0,122,255,0.15);border-radius:2px;margin-top:8px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .1s;}
+  .hidden{display:none;}
+  .context-strip{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;overflow:hidden;position:relative;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .context-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
+  .context-scroll{white-space:nowrap;overflow:hidden;font-family:var(--serif);font-size:15px;line-height:1.5;position:relative;}
+  .ctx-word{display:inline;padding:1px 2px;border-radius:3px;margin:0 1px;}
+  .ctx-target{background:rgba(0,122,255,0.15);color:var(--blue);font-weight:600;border-radius:4px;padding:1px 4px;}
+  .ctx-other{background:rgba(0,122,255,0.06);color:var(--blue);border-radius:3px;padding:1px 2px;}
+  .ctx-stop{color:var(--muted);}
+  .ctx-content{color:var(--text);}
+  .context-strip.hidden{display:none;}
+  .play-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:10px;padding:2px 7px;cursor:pointer;font-family:var(--mono);transition:all .12s;white-space:nowrap;}
+  .play-btn:hover{background:var(--blue);border-color:var(--blue);color:#fff;}
+</style>
+</head>
+<body>
+
+<h1>Alice in Wonderland — Ch. 1</h1>
+<p class="subtitle">Continuous iterator stream · 1010 words · entry/exit digest per occurrence · three search modes</p>
+
+<div id="build-progress" class="build-progress">
+  <span id="build-msg">Building iterator stream… 0 / 1010 words</span>
+  <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+</div>
+
+<div id="main" class="hidden">
+
+  <div class="card">
+    <div class="stat-row" id="global-stats"></div>
+    <div class="section-title">Search</div>
+    <div class="mode-row">
+      <button class="mode-btn active" onclick="setMode('lemma')" id="m-lemma">Lemma</button>
+      <button class="mode-btn" onclick="setMode('phrase')" id="m-phrase">Phrase → digest</button>
+      <button class="mode-btn" onclick="setMode('proximity')" id="m-proximity">Digest proximity</button>
+      <button class="mode-btn" onclick="setMode('jstats')" id="m-jstats">J-stream stats</button>
+    </div>
+    <div class="search-row">
+      <input type="text" id="query" placeholder="alice" onkeydown="if(event.key==='Enter')search()">
+      <button class="go" onclick="search()">Search</button>
+    </div>
+    <div id="mode-hint" style="color:var(--muted);font-size:10px;margin-top:-6px;margin-bottom:10px;">Find all occurrences of a word (lemmatised) in the stream</div>
+  </div>
+
+  <div id="context-strip" class="context-strip hidden">
+    <div class="context-label">Context — <span id="ctx-info"></span> &nbsp;·&nbsp; <span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="stopScroll()">■ stop</span> &nbsp;·&nbsp; <span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="restartScroll()">▶ restart</span></div>
+    <div class="context-scroll" id="ctx-scroll"></div>
+  </div>
+
+  <div class="card" id="results-card" style="display:none">
+    <div class="section-title" id="results-title">Results</div>
+    <div class="tbl-wrap">
+      <div class="tbl-scroll">
+        <table id="results-table">
+          <thead id="results-head"></thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Top content words</div>
+    <div class="tbl-wrap">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>lemma</th><th>freq</th><th>entry range</th><th>J profile (first occ)</th></tr></thead>
+          <tbody id="vocab-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── ITERATOR ─────────────────────────────────────────────────────────────────
+const PL=1.094, D=0.002, T=0.08781, SEED=0.087801;
+function tr14(x){return Math.round(x*1e14)/1e14;}
+function sgn(x){return x>0?1:x<0?-1:0;}
+function step(h,f){const v=h*h-f;return tr14(v*v-f);}
+function interrogate(h1,h2){
+  const Fp=h1>T?PL+D:PL,inn=h1+Fp;
+  if(inn>=0){const v2=Fp-Math.sqrt(inn);if(v2>=0)return sgn(tr14(Math.sqrt(v2))-h2);}
+  return sgn(h1-h2);
+}
+function jHangOf(h1,h2){
+  const Fp=h1>T?PL+D:PL,inn=h1+Fp;
+  if(inn>=0){const v2=Fp-Math.sqrt(inn);if(v2>=0)return sgn(tr14(Math.sqrt(v2))-h2);}
+  return sgn(h1-h2);
+}
+
+// ── LEMMATISER ────────────────────────────────────────────────────────────────
+const IRREGULAR={went:'go',gone:'go',going:'go',goes:'go',was:'be',were:'be',been:'be',
+  is:'be',are:'be',had:'have',has:'have',did:'do',done:'do',said:'say',says:'say',
+  saw:'see',seen:'see',came:'come',coming:'come',got:'get',gotten:'get',took:'take',
+  taken:'take',ran:'run',fell:'fall',fallen:'fall',felt:'feel',thought:'think',
+  knew:'know',known:'know',began:'begin',begun:'begin',kept:'keep',found:'find',
+  left:'leave',made:'make',told:'tell',children:'child',mice:'mouse',feet:'foot'};
+const STOPS=new Set(['the','a','an','and','or','but','in','on','at','to','for','of',
+  'with','by','from','as','is','was','are','were','be','been','have','has','had',
+  'do','does','did','will','would','could','should','may','might','it','its',
+  'this','that','i','you','he','she','we','they','me','him','her','us','them',
+  'my','your','his','our','their','what','which','who','when','where','how',
+  'all','each','both','no','not','so','than','too','very','just','there','here']);
+
+function lemmatise(w){
+  w=w.toLowerCase();
+  if(IRREGULAR[w])return IRREGULAR[w];
+  if(w.endsWith("'s"))return w.slice(0,-2);
+  if(w.endsWith('ies')&&w.length>4)return w.slice(0,-3)+'y';
+  if(w.endsWith('ing')&&w.length>6){const s=w.slice(0,-3);return s[s.length-1]===s[s.length-2]?s.slice(0,-1):s;}
+  if(w.endsWith('ed')&&w.length>5){const s=w.slice(0,-2);return s[s.length-1]===s[s.length-2]?s.slice(0,-1):s;}
+  if(w.endsWith('er')&&w.length>5)return w.slice(0,-2);
+  if(w.endsWith('s')&&w.length>3&&!w.endsWith('ss'))return w.slice(0,-1);
+  return w;
+}
+function tokenise(text){return (text.match(/[a-zA-Z']+/g)||[]).map(t=>t.replace(/^'+|'+$/g,'')).filter(t=>t.length>1);}
+
+// ── PAYLOAD BITS ──────────────────────────────────────────────────────────────
+function payloadBits(word){
+  const bits=[];
+  for(const b of new TextEncoder().encode(word))
+    for(let i=7;i>=0;i--)bits.push((b>>i)&1);
+  return bits;
+}
+
+// ── ENCODE WORD SLICE ─────────────────────────────────────────────────────────
+function encodeWord(bits, hPrev, hPrev2){
+  const absJ=[];
+  let h=[hPrev2, hPrev]; // h[-2], h[-1] equivalents
+  // n=1: always target
+  let bi=0;
+  const fn0=PL+bits[bi++]*D;
+  const h1=step(h[1],fn0); h.push(h1); absJ.push(0);
+  // n>=2
+  while(bi<bits.length){
+    const h_1=h[h.length-1], h_2=h[h.length-2];
+    const j=interrogate(h_1,h_2);
+    const fn=j===0?PL+bits[bi++]*D:(j===1?PL+D:PL);
+    h.push(step(h_1,fn)); absJ.push(Math.abs(j));
+  }
+  const exit=h[h.length-1];
+  const jH=jHangOf(h[h.length-1],h[h.length-2]);
+  return {exit, absJ, jHang:jH, N:absJ.length};
+}
+
+// ── DATABASE — minimal: [pos, word, entry] only ───────────────────────────────
+// Everything else (exit, absJ, jHang, N, lemma, isStop) derived on demand
+let DB=[];  // [{pos, word, entry}]
+
+function buildDB(text){
+  return new Promise(resolve=>{
+    const words=tokenise(text);
+    const total=words.length;
+    let done=0;
+    const chunk=50;
+    let h2=SEED, h1=SEED;
+
+    function processChunk(start){
+      const end=Math.min(start+chunk,total);
+      for(let i=start;i<end;i++){
+        const word=words[i];
+        const entry=h1;
+        const bits=payloadBits(word);
+        const r=encodeWord(bits,h1,h2);
+        DB.push({pos:i, word, entry});
+        h2=h1; h1=r.exit; done++;
+      }
+      const pct=Math.round(done/total*100);
+      document.getElementById('build-msg').textContent=`Building iterator stream… ${done} / ${total} words`;
+      document.getElementById('prog').style.width=pct+'%';
+      if(end<total) setTimeout(()=>processChunk(end),0);
+      else resolve();
+    }
+    processChunk(0);
+  });
+}
+
+// Derive full record for a DB entry on demand
+function derive(rec){
+  const bits=payloadBits(rec.word);
+  // Need h2 (entry of previous word), use DB[pos-1].entry or SEED
+  const h2=rec.pos>0?DB[rec.pos-1].entry:SEED;
+  const r=encodeWord(bits,rec.entry,h2);
+  const lemma=lemmatise(rec.word);
+  return {...rec, lemma, exit:r.exit, absJ:r.absJ, jHang:r.jHang, N:r.N,
+          isStop:STOPS.has(lemma)?1:0};
+}
+
+// ── SEARCH MODES ──────────────────────────────────────────────────────────────
+let mode='lemma';
+const hints={
+  lemma:'Find all occurrences of a word (lemmatised) in the stream',
+  phrase:'Encode phrase as iterator stream → find nearest exit digests in chapter',
+  proximity:'Enter a digest value (14dp) → find nearest entry/exit positions',
+  jstats:'J-stream statistics across all occurrences of a word'
+};
+function setMode(m){
+  mode=m;
+  ['lemma','phrase','proximity','jstats'].forEach(x=>{
+    document.getElementById('m-'+x).className='mode-btn'+(x===m?' active':'');
+  });
+  const ph={lemma:'alice',phrase:'down the rabbit hole',proximity:'0.08871801461829',jstats:'rabbit'};
+  document.getElementById('query').placeholder=ph[m];
+  document.getElementById('mode-hint').textContent=hints[m];
+  document.getElementById('results-card').style.display='none';
+}
+
+function search(){
+  const q=document.getElementById('query').value.trim();
+  if(!q)return;
+  if(mode==='lemma')     searchLemma(q);
+  else if(mode==='phrase')    searchPhrase(q);
+  else if(mode==='proximity') searchProximity(q);
+  else if(mode==='jstats')    searchJStats(q);
+}
+
+function showTable(title,headers,rows,highlightFn){
+  document.getElementById('results-card').style.display='';
+  document.getElementById('results-title').textContent=title;
+  const head=document.getElementById('results-head');
+  const body=document.getElementById('results-body');
+  head.innerHTML='<tr>'+headers.map(h=>`<th>${h}</th>`).join('')+'<th></th></tr>';
+  body.innerHTML='';
+  if(!rows.length){body.innerHTML='<tr><td colspan="'+(headers.length+1)+'" class="empty">No results</td></tr>';return;}
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    if(highlightFn&&highlightFn(r))tr.className='highlight';
+    tr.innerHTML=r.cells.map(c=>`<td>${c}</td>`).join('');
+    const td=document.createElement('td');
+    if(r.r&&r.r.pos!==undefined){
+      const btn=document.createElement('button');
+      btn.className='play-btn';
+      btn.textContent='▶ play';
+      btn.onclick=(e)=>{e.stopPropagation();playContext(r.r.pos,r.r.word,12,tr);};
+      td.appendChild(btn);
+      tr.style.cursor='pointer';
+      tr.onclick=()=>playContext(r.r.pos,r.r.word,12,tr);
+    }
+    tr.appendChild(td);
+    body.appendChild(tr);
+  });
+  document.getElementById('results-card').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function jBar(absJ,max=40){
+  const slice=absJ.slice(0,max);
+  return '<span class="jbar">'+slice.map(v=>`<span class="jb ${v?'jb-ctl':'jb-tgt'}"></span>`).join('')+'</span>';
+}
+
+function fmt(x){return x.toFixed(14);}
+
+function searchLemma(q){
+  const lemma=lemmatise(q);
+  const rows=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>derive(r));
+  showTable(
+    `"${lemma}" — ${rows.length} occurrence${rows.length!==1?'s':''}`,
+    ['pos','word','entry digest','exit digest','N','J profile'],
+    rows.map(r=>({cells:[r.pos,r.word,fmt(r.entry),fmt(r.exit),r.N,jBar(r.absJ)],r})),
+    ()=>false
+  );
+}
+
+function searchPhrase(q){
+  const words=tokenise(q);
+  if(!words.length)return;
+  let h2=SEED, h1=SEED, phraseDigest=SEED;
+  for(const w of words){
+    const bits=payloadBits(w);
+    const r=encodeWord(bits,h1,h2);
+    h2=h1; h1=r.exit; phraseDigest=r.exit;
+  }
+  const eps=1e-3;
+  const scored=DB.map(r=>{
+    const d=derive(r);
+    return {...d, distEntry:Math.abs(d.entry-phraseDigest), distExit:Math.abs(d.exit-phraseDigest)};
+  }).filter(r=>r.distEntry<eps||r.distExit<eps)
+    .sort((a,b)=>Math.min(a.distEntry,a.distExit)-Math.min(b.distEntry,b.distExit))
+    .slice(0,15);
+  showTable(
+    `Phrase "${q}" → digest ${phraseDigest.toFixed(8)} — ${scored.length} near matches`,
+    ['pos','word','lemma','entry dist','exit dist','N'],
+    scored.map(r=>({cells:[r.pos,r.word,r.lemma,r.distEntry.toExponential(2),r.distExit.toExponential(2),r.N],r})),
+    r=>Math.min(r.distEntry,r.distExit)<1e-5
+  );
+}
+
+function searchProximity(q){
+  const digest=parseFloat(q);
+  if(isNaN(digest))return;
+  const eps=1e-3;
+  const scored=DB.map(r=>{
+    const d=derive(r);
+    return {...d, distEntry:Math.abs(d.entry-digest), distExit:Math.abs(d.exit-digest)};
+  }).filter(r=>r.distEntry<eps||r.distExit<eps)
+    .sort((a,b)=>Math.min(a.distEntry,a.distExit)-Math.min(b.distEntry,b.distExit))
+    .slice(0,20);
+  showTable(
+    `Digest ${digest.toFixed(8)} — ${scored.length} near matches`,
+    ['pos','word','lemma','entry dist','exit dist'],
+    scored.map(r=>({cells:[r.pos,r.word,r.lemma,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
+    r=>Math.min(r.distEntry,r.distExit)<1e-5
+  );
+}
+
+function searchJStats(q){
+  const lemma=lemmatise(q);
+  const rows=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>derive(r));
+  if(!rows.length){showTable(`"${lemma}" — not found`,['pos','word','N','control','target','ctl%'],[]);return;}
+  showTable(
+    `J-stream: "${lemma}" across ${rows.length} occurrence${rows.length!==1?'s':''}`,
+    ['pos','word','N','control','target','ctl%','J profile'],
+    rows.map(r=>{
+      const ctl=r.absJ.filter(v=>v).length, tgt=r.N-ctl;
+      return {cells:[r.pos,r.word,r.N,ctl,tgt,Math.round(ctl/r.N*100)+'%',jBar(r.absJ)],r};
+    }),
+    ()=>false
+  );
+}
+
+// ── VOCAB TABLE ───────────────────────────────────────────────────────────────
+function buildVocabTable(){
+  const freq={}, minEntry={}, maxExit={}, firstAbsJ={};
+  for(const rec of DB){
+    const r=derive(rec);
+    if(r.isStop) continue;
+    freq[r.lemma]=(freq[r.lemma]||0)+1;
+    if(minEntry[r.lemma]===undefined||r.entry<minEntry[r.lemma]) minEntry[r.lemma]=r.entry;
+    if(maxExit[r.lemma]===undefined||r.exit>maxExit[r.lemma])   maxExit[r.lemma]=r.exit;
+    if(!firstAbsJ[r.lemma]) firstAbsJ[r.lemma]=r.absJ;
+  }
+  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  const tbody=document.getElementById('vocab-body');
+  tbody.innerHTML='';
+  for(const [lemma,f] of top){
+    const tr=document.createElement('tr');
+    const firstRec=DB.find(r=>lemmatise(r.word)===lemma);
+    const firstPos=firstRec?firstRec.pos:0;
+    tr.style.cursor='pointer'; tr.title='Click to view in context';
+    tr.onclick=()=>{document.getElementById('query').value=lemma;setMode('lemma');search();playContext(firstPos,lemma,12);};
+    tr.innerHTML=`<td><span class="c-blue">${lemma}</span></td><td>${f}</td><td style="color:var(--muted)">${minEntry[lemma].toFixed(6)}…${maxExit[lemma].toFixed(6)}</td><td>${jBar(firstAbsJ[lemma]||[],30)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// ── GLOBAL STATS ──────────────────────────────────────────────────────────────
+function buildGlobalStats(){
+  const N=DB.length;
+  const uniqueLemmas=new Set(DB.filter(r=>!STOPS.has(lemmatise(r.word))).map(r=>lemmatise(r.word))).size;
+  const finalDigest=DB.length>0?derive(DB[DB.length-1]).exit:SEED;
+  const el=document.getElementById('global-stats');
+  el.innerHTML=`
+    <div class="stat"><span class="stat-k">words</span><span class="stat-v">${N}</span></div>
+    <div class="stat"><span class="stat-k">unique lemmas</span><span class="stat-v">${uniqueLemmas}</span></div>
+    <div class="stat"><span class="stat-k">DB record</span><span class="stat-v c-green">pos · word · entry</span></div>
+    <div class="stat"><span class="stat-k">final digest</span><span class="stat-v c-blue">${finalDigest.toFixed(8)}</span></div>
+  `;
+}
+
+// ── CONTEXT VIEWER ───────────────────────────────────────────────────────────
+let scrollTimer=null, activeRow=null;
+
+function setActiveRow(tr){
+  if(activeRow){activeRow.style.background='';}
+  activeRow=tr;
+  if(tr) tr.style.background='rgba(0,122,255,0.10)';
+}
+
+function playContext(pos, word, window=12, triggerRow){
+  if(scrollTimer){clearInterval(scrollTimer);scrollTimer=null;}
+  if(triggerRow!==undefined) setActiveRow(triggerRow);
+  const strip=document.getElementById('context-strip');
+  const scroll=document.getElementById('ctx-scroll');
+  const info=document.getElementById('ctx-info');
+  strip.classList.remove('hidden');
+  const lemma=lemmatise(word);
+  const allOcc=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>r.pos);
+  const occIdx=allOcc.indexOf(pos);
+  info.textContent=`"${word}" · pos ${pos}${allOcc.length>1?' (occ '+(occIdx+1)+'/'+allOcc.length+')':''}`;
+
+  // 3 words before target, then window words after
+  const start=Math.max(0,pos-3);
+  const end=Math.min(DB.length-1,pos+window);
+  scroll.innerHTML='';
+  scroll.style.transform='translateX(0px)';
+
+  for(let i=start;i<=end;i++){
+    const r=DB[i];
+    const sp=document.createElement('span');
+    const isTarget=i===pos;
+    const isOtherOcc=allOcc.includes(i)&&!isTarget;
+    const isStop=STOPS.has(lemmatise(r.word));
+    sp.className='ctx-word '+(isTarget?'ctx-target':isOtherOcc?'ctx-other':isStop?'ctx-stop':'ctx-content');
+    sp.textContent=r.word+' ';
+    if(isTarget) sp.id='ctx-target-word';
+    scroll.appendChild(sp);
+  }
+
+  // Start from left, scroll slowly through the window then stop
+  requestAnimationFrame(()=>{
+    const stripW=scroll.parentElement.offsetWidth;
+    const totalW=scroll.scrollWidth;
+    let offset=0;
+    const maxOffset=Math.max(0,totalW-stripW);
+    scrollTimer=setInterval(()=>{
+      offset+=0.5;
+      if(offset>=maxOffset){
+        scroll.style.transform=`translateX(-${maxOffset}px)`;
+        clearInterval(scrollTimer);scrollTimer=null;return;
+      }
+      scroll.style.transform=`translateX(-${offset}px)`;
+    },16);
+  });
+}
+function showContext(pos,word){playContext(pos,word,12);}
+
+function stopScroll(){if(scrollTimer){clearInterval(scrollTimer);scrollTimer=null;}}
+function restartScroll(){
+  const strip=document.getElementById('context-strip');
+  if(!strip.classList.contains('hidden')){
+    const scroll=document.getElementById('ctx-scroll');
+    const stripW=scroll.parentElement.offsetWidth;
+    let offset=parseFloat(scroll.style.transform.replace('translateX(-','').replace('px)','')||'0');
+    stopScroll();
+    scrollTimer=setInterval(()=>{
+      offset+=0.4;
+      const maxOffset=scroll.scrollWidth-stripW;
+      if(offset>=maxOffset){clearInterval(scrollTimer);scrollTimer=null;return;}
+      scroll.style.transform=`translateX(-${offset}px)`;
+    },16);
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+const CHAPTER_1=`Alice was beginning to get very tired of sitting by her sister on the bank
+and of having nothing to do once or twice she had peeped into the book her
+sister was reading but it had no pictures or conversations in it and what
+is the use of a book thought Alice without pictures or conversations
+So she was considering in her own mind as well as she could for the hot day
+made her feel very sleepy and stupid whether the pleasure of making a
+daisy chain would be worth the trouble of getting up and picking the daisies
+when suddenly a White Rabbit with pink eyes ran close by her
+There was nothing so very remarkable in that nor did Alice think it so very
+much out of the way to hear the Rabbit say to itself Oh dear Oh dear I shall
+be late when she thought it over afterwards it occurred to her that she ought
+to have wondered at this but at the time it all seemed quite natural but when
+the Rabbit actually took a watch out of its waistcoat pocket and looked at it
+and then hurried on Alice started to her feet for it flashed across her mind
+that she had never before seen a rabbit with either a waistcoat pocket or a
+watch to take out of it and burning with curiosity she ran across the field
+after it and fortunately was just in time to see it pop down a large
+rabbit hole under the hedge
+In another moment down went Alice after it never once considering how in the
+world she was to get out again The rabbit hole went straight on like a tunnel
+for some way and then dipped suddenly down so suddenly that Alice had not a
+moment to think about stopping herself before she found herself falling down a
+very deep well
+Either the well was very deep or she fell very slowly for she had plenty of
+time as she went down to look about her and to wonder what was going to happen
+next First she tried to look down and make out what she was coming to but it
+was too dark to see anything then she looked at the sides of the well and
+noticed that they were filled with cupboards and book shelves here and there
+she saw maps and pictures hung upon pegs She took down a jar from one of the
+shelves as she passed it was labelled ORANGE MARMALADE but to her great
+disappointment it was empty she did not like to drop the jar for fear of
+killing somebody underneath so managed to put it into one of the cupboards as
+she fell past it
+Well thought Alice to herself after such a fall as this I shall think nothing
+of tumbling down stairs How brave they will call me when I get home Why
+I would not say anything about it even if I fell off the top of the house
+And she went on falling and falling and falling
+Down down down Would the fall never come to an end I wonder how many miles
+I have fallen by this time she said aloud I must be getting somewhere near the
+centre of the earth Let me see that would be four thousand miles down I think
+for you see Alice had learnt several things of this sort in her lessons in the
+schoolroom and though this was not a very good opportunity for showing off her
+knowledge as there was no one to listen to her still it was good practice to
+say it over Yes that is about the right amount she said aloud continuing her
+calculations But then I wonder if I shall fall right through the earth How
+funny it will seem to come out among the people that walk with their heads
+downward The Antipathies I think she was rather glad there was no one
+listening this time as it did not seem at all the right word
+But I shall have to ask them what the name of the country is you know Please
+is this New Zealand or Australia and she tried to curtsey as she spoke
+fancy curtseying as you are falling through the air Do you think you could
+manage it And what an ignorant little girl she will think me for asking No
+it will never do to ask perhaps I shall see it written up somewhere
+Down down down There was nothing else to do so Alice soon began talking to
+herself Dinah will miss me very much tonight I hope they will remember her saucer
+of milk at tea time Dinah my dear I wish you were down here with me There
+are no mice in the air I am afraid but you might catch a bat and that is very
+like a mouse you know But do cats eat bats And here Alice began to get rather
+sleepy and went on saying to herself in a dreamy sort of way Do cats eat bats
+Do cats eat bats and sometimes Do bats eat cats for you see as she could not
+answer either question it did not much matter which way she put it
+She felt that she was dozing off and had just begun to dream that she was
+walking hand in hand with Dinah and saying to her very earnestly Now Dinah
+tell me the truth did you ever eat a bat when suddenly thump thump down
+she came upon a heap of sticks and dry leaves and the fall was over
+Alice was not a bit hurt and she jumped up on to her feet in a moment she
+looked up but it was all dark overhead before her was another long passage
+and the White Rabbit was still in sight hurrying down it There was not a
+moment to be lost away went Alice like the wind and was just in time to hear
+it say as it turned a corner Oh my ears and whiskers how late it is getting
+She was close behind it when she turned the corner but the Rabbit was no longer
+to be seen she found herself in a long low hall which was lit up by a row of
+lamps hanging from the roof`;
+
+buildDB(CHAPTER_1).then(()=>{
+  document.getElementById('build-progress').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+  buildGlobalStats();
+  buildVocabTable();
+  // Default search
+  document.getElementById('query').value='alice';
+  searchLemma('alice');
+});
+</script>
+
+</body>
+</html>
