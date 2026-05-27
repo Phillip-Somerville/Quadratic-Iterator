@@ -113,7 +113,7 @@
     <div class="tbl-wrap">
       <div class="tbl-scroll">
         <table>
-          <thead><tr><th>lemma</th><th>freq</th><th>entry range</th><th>J profile (first occ)</th></tr></thead>
+          <thead><tr><th>lemma</th><th>freq</th><th>N range</th><th>J profile (first occ)</th></tr></thead>
           <tbody id="vocab-body"></tbody>
         </table>
       </div>
@@ -139,32 +139,23 @@ function jHangOf(h1,h2){
   return sgn(h1-h2);
 }
 
-// ── LEMMATISER ────────────────────────────────────────────────────────────────
-const IRREGULAR={went:'go',gone:'go',going:'go',goes:'go',was:'be',were:'be',been:'be',
-  is:'be',are:'be',had:'have',has:'have',did:'do',done:'do',said:'say',says:'say',
-  saw:'see',seen:'see',came:'come',coming:'come',got:'get',gotten:'get',took:'take',
-  taken:'take',ran:'run',fell:'fall',fallen:'fall',felt:'feel',thought:'think',
-  knew:'know',known:'know',began:'begin',begun:'begin',kept:'keep',found:'find',
-  left:'leave',made:'make',told:'tell',children:'child',mice:'mouse',feet:'foot'};
-const STOPS=new Set(['the','a','an','and','or','but','in','on','at','to','for','of',
-  'with','by','from','as','is','was','are','were','be','been','have','has','had',
-  'do','does','did','will','would','could','should','may','might','it','its',
-  'this','that','i','you','he','she','we','they','me','him','her','us','them',
-  'my','your','his','our','their','what','which','who','when','where','how',
-  'all','each','both','no','not','so','than','too','very','just','there','here']);
 
-function lemmatise(w){
-  w=w.toLowerCase();
-  if(IRREGULAR[w])return IRREGULAR[w];
-  if(w.endsWith("'s"))return w.slice(0,-2);
-  if(w.endsWith('ies')&&w.length>4)return w.slice(0,-3)+'y';
-  if(w.endsWith('ing')&&w.length>6){const s=w.slice(0,-3);return s[s.length-1]===s[s.length-2]?s.slice(0,-1):s;}
-  if(w.endsWith('ed')&&w.length>5){const s=w.slice(0,-2);return s[s.length-1]===s[s.length-2]?s.slice(0,-1):s;}
-  if(w.endsWith('er')&&w.length>5)return w.slice(0,-2);
-  if(w.endsWith('s')&&w.length>3&&!w.endsWith('ss'))return w.slice(0,-1);
-  return w;
-}
-function tokenise(text){return (text.match(/[a-zA-Z']+/g)||[]).map(t=>t.replace(/^'+|'+$/g,'')).filter(t=>t.length>1);}
+// ── LEMMATISER — identity, lowercase only ────────────────────────────────────
+// No normalisation. Every surface form is its own distinct iterator payload.
+// "thought", "think", "thinking" are three separate words with separate paths.
+
+const STOPS=new Set(['the','a','an','and','or','but','in','on','at','to','for','of',
+  'with','by','from','as','be','was','were','is','am','are','been',
+  'have','had','has','do','did','does','will','would','could','should',
+  'may','might','it','its','this','that','i','you','he','she','we','they',
+  'me','him','her','us','them','my','your','his','our','their','what','which',
+  'who','when','where','how','all','each','both','no','not','so','than','too',
+  'very','just','there','here','up','out','if','about','into','then',
+  'now','own','same','such','also','after','before','over','under','again',
+  'once','more','most','other','some','any','said','got','went','came']);
+
+function lemmatise(w){ return w.toLowerCase(); }
+function tokenise(text){return (text.match(/[a-zA-Z']+/g)||[]).map(t=>t.replace(/^'+|'+$/g,'')).filter(t=>t.length>0);}
 
 // ── PAYLOAD BITS ──────────────────────────────────────────────────────────────
 function payloadBits(word){
@@ -194,9 +185,13 @@ function encodeWord(bits, hPrev, hPrev2){
   return {exit, absJ, jHang:jH, N:absJ.length};
 }
 
-// ── DATABASE — minimal: [pos, word, entry] only ───────────────────────────────
-// Everything else (exit, absJ, jHang, N, lemma, isStop) derived on demand
-let DB=[];  // [{pos, word, entry}]
+// ── DATABASE — canonical: pos · lemma · entry · N ────────────────────────────
+// lemma: minimal semantic token
+// entry: orbit state at word boundary (entry edge)
+// N:     traversal depth — unique per instance, varies by orbit context
+// exit, absJ, jHang: all derived on demand from (lemma, entry, N)
+// Cross-word chain: exit[i] == entry[i+1] by construction
+let DB=[];  // [{pos, lemma, entry, N}]
 
 function buildDB(text){
   return new Promise(resolve=>{
@@ -210,10 +205,11 @@ function buildDB(text){
       const end=Math.min(start+chunk,total);
       for(let i=start;i<end;i++){
         const word=words[i];
+        const lemma=lemmatise(word);
         const entry=h1;
-        const bits=payloadBits(word);
+        const bits=payloadBits(lemma);  // encode lemma, not raw word
         const r=encodeWord(bits,h1,h2);
-        DB.push({pos:i, word, entry});
+        DB.push({pos:i, lemma, entry, N:r.N});
         h2=h1; h1=r.exit; done++;
       }
       const pct=Math.round(done/total*100);
@@ -226,15 +222,17 @@ function buildDB(text){
   });
 }
 
-// Derive full record for a DB entry on demand
+// Derive full record on demand from stored (lemma, entry, N)
+// h2 = entry of previous record (cross-word chain continuity)
 function derive(rec){
-  const bits=payloadBits(rec.word);
-  // Need h2 (entry of previous word), use DB[pos-1].entry or SEED
+  const bits=payloadBits(rec.lemma);
   const h2=rec.pos>0?DB[rec.pos-1].entry:SEED;
   const r=encodeWord(bits,rec.entry,h2);
-  const lemma=lemmatise(rec.word);
-  return {...rec, lemma, exit:r.exit, absJ:r.absJ, jHang:r.jHang, N:r.N,
-          isStop:STOPS.has(lemma)?1:0};
+  const isStop=STOPS.has(rec.lemma);
+  // Verify depth matches stored N
+  const depthMatch=r.N===rec.N;
+  return {...rec, exit:r.exit, absJ:r.absJ, jHang:r.jHang,
+          isStop, depthMatch, word:rec.lemma};
 }
 
 // ── SEARCH MODES ──────────────────────────────────────────────────────────────
@@ -302,11 +300,11 @@ function fmt(x){return x.toFixed(14);}
 
 function searchLemma(q){
   const lemma=lemmatise(q);
-  const rows=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>derive(r));
+  const rows=DB.filter(r=>r.lemma===lemma).map(r=>derive(r));
   showTable(
     `"${lemma}" — ${rows.length} occurrence${rows.length!==1?'s':''}`,
-    ['pos','word','entry digest','exit digest','N','J profile'],
-    rows.map(r=>({cells:[r.pos,r.word,fmt(r.entry),fmt(r.exit),r.N,jBar(r.absJ)],r})),
+    ['pos','lemma','entry digest','exit digest','N','J profile'],
+    rows.map(r=>({cells:[r.pos,r.lemma,fmt(r.entry),fmt(r.exit),r.N,jBar(r.absJ)],r})),
     ()=>false
   );
 }
@@ -316,7 +314,7 @@ function searchPhrase(q){
   if(!words.length)return;
   let h2=SEED, h1=SEED, phraseDigest=SEED;
   for(const w of words){
-    const bits=payloadBits(w);
+    const bits=payloadBits(lemmatise(w));
     const r=encodeWord(bits,h1,h2);
     h2=h1; h1=r.exit; phraseDigest=r.exit;
   }
@@ -329,8 +327,8 @@ function searchPhrase(q){
     .slice(0,15);
   showTable(
     `Phrase "${q}" → digest ${phraseDigest.toFixed(8)} — ${scored.length} near matches`,
-    ['pos','word','lemma','entry dist','exit dist','N'],
-    scored.map(r=>({cells:[r.pos,r.word,r.lemma,r.distEntry.toExponential(2),r.distExit.toExponential(2),r.N],r})),
+    ['pos','lemma','N','entry dist','exit dist'],
+    scored.map(r=>({cells:[r.pos,r.lemma,r.N,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
     r=>Math.min(r.distEntry,r.distExit)<1e-5
   );
 }
@@ -347,22 +345,22 @@ function searchProximity(q){
     .slice(0,20);
   showTable(
     `Digest ${digest.toFixed(8)} — ${scored.length} near matches`,
-    ['pos','word','lemma','entry dist','exit dist'],
-    scored.map(r=>({cells:[r.pos,r.word,r.lemma,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
+    ['pos','lemma','N','entry dist','exit dist'],
+    scored.map(r=>({cells:[r.pos,r.lemma,r.N,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
     r=>Math.min(r.distEntry,r.distExit)<1e-5
   );
 }
 
 function searchJStats(q){
   const lemma=lemmatise(q);
-  const rows=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>derive(r));
-  if(!rows.length){showTable(`"${lemma}" — not found`,['pos','word','N','control','target','ctl%'],[]);return;}
+  const rows=DB.filter(r=>r.lemma===lemma).map(r=>derive(r));
+  if(!rows.length){showTable(`"${lemma}" — not found`,['pos','lemma','N','control','target','ctl%'],[]);return;}
   showTable(
     `J-stream: "${lemma}" across ${rows.length} occurrence${rows.length!==1?'s':''}`,
-    ['pos','word','N','control','target','ctl%','J profile'],
+    ['pos','lemma','N','control','target','ctl%','J profile'],
     rows.map(r=>{
       const ctl=r.absJ.filter(v=>v).length, tgt=r.N-ctl;
-      return {cells:[r.pos,r.word,r.N,ctl,tgt,Math.round(ctl/r.N*100)+'%',jBar(r.absJ)],r};
+      return {cells:[r.pos,r.lemma,r.N,ctl,tgt,Math.round(ctl/r.N*100)+'%',jBar(r.absJ)],r};
     }),
     ()=>false
   );
@@ -370,13 +368,15 @@ function searchJStats(q){
 
 // ── VOCAB TABLE ───────────────────────────────────────────────────────────────
 function buildVocabTable(){
-  const freq={}, minEntry={}, maxExit={}, firstAbsJ={};
+  const freq={}, minEntry={}, maxExit={}, firstAbsJ={}, minN={}, maxN={};
   for(const rec of DB){
     const r=derive(rec);
     if(r.isStop) continue;
     freq[r.lemma]=(freq[r.lemma]||0)+1;
     if(minEntry[r.lemma]===undefined||r.entry<minEntry[r.lemma]) minEntry[r.lemma]=r.entry;
     if(maxExit[r.lemma]===undefined||r.exit>maxExit[r.lemma])   maxExit[r.lemma]=r.exit;
+    if(minN[r.lemma]===undefined||r.N<minN[r.lemma]) minN[r.lemma]=r.N;
+    if(maxN[r.lemma]===undefined||r.N>maxN[r.lemma]) maxN[r.lemma]=r.N;
     if(!firstAbsJ[r.lemma]) firstAbsJ[r.lemma]=r.absJ;
   }
   const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,20);
@@ -384,11 +384,12 @@ function buildVocabTable(){
   tbody.innerHTML='';
   for(const [lemma,f] of top){
     const tr=document.createElement('tr');
-    const firstRec=DB.find(r=>lemmatise(r.word)===lemma);
+    const firstRec=DB.find(r=>r.lemma===lemma);
     const firstPos=firstRec?firstRec.pos:0;
+    const nRange=minN[lemma]===maxN[lemma]?`${minN[lemma]}`:`${minN[lemma]}–${maxN[lemma]}`;
     tr.style.cursor='pointer'; tr.title='Click to view in context';
     tr.onclick=()=>{document.getElementById('query').value=lemma;setMode('lemma');search();playContext(firstPos,lemma,12);};
-    tr.innerHTML=`<td><span class="c-blue">${lemma}</span></td><td>${f}</td><td style="color:var(--muted)">${minEntry[lemma].toFixed(6)}…${maxExit[lemma].toFixed(6)}</td><td>${jBar(firstAbsJ[lemma]||[],30)}</td>`;
+    tr.innerHTML=`<td><span class="c-blue">${lemma}</span></td><td>${f}</td><td style="color:var(--muted)">${nRange}</td><td>${jBar(firstAbsJ[lemma]||[],30)}</td>`;
     tbody.appendChild(tr);
   }
 }
@@ -396,13 +397,16 @@ function buildVocabTable(){
 // ── GLOBAL STATS ──────────────────────────────────────────────────────────────
 function buildGlobalStats(){
   const N=DB.length;
-  const uniqueLemmas=new Set(DB.filter(r=>!STOPS.has(lemmatise(r.word))).map(r=>lemmatise(r.word))).size;
-  const finalDigest=DB.length>0?derive(DB[DB.length-1]).exit:SEED;
+  const uniqueLemmas=new Set(DB.filter(r=>!STOPS.has(r.lemma)).map(r=>r.lemma)).size;
+  const finalRec=DB[DB.length-1];
+  const finalDigest=finalRec?derive(finalRec).exit:SEED;
+  const totalDepth=DB.reduce((s,r)=>s+r.N,0);
   const el=document.getElementById('global-stats');
   el.innerHTML=`
     <div class="stat"><span class="stat-k">words</span><span class="stat-v">${N}</span></div>
     <div class="stat"><span class="stat-k">unique lemmas</span><span class="stat-v">${uniqueLemmas}</span></div>
-    <div class="stat"><span class="stat-k">DB record</span><span class="stat-v c-green">pos · word · entry</span></div>
+    <div class="stat"><span class="stat-k">total depth</span><span class="stat-v">${totalDepth.toLocaleString()}</span></div>
+    <div class="stat"><span class="stat-k">DB record</span><span class="stat-v c-green">pos · lemma · entry · N</span></div>
     <div class="stat"><span class="stat-k">final digest</span><span class="stat-v c-blue">${finalDigest.toFixed(8)}</span></div>
   `;
 }
@@ -424,7 +428,7 @@ function playContext(pos, word, window=12, triggerRow){
   const info=document.getElementById('ctx-info');
   strip.classList.remove('hidden');
   const lemma=lemmatise(word);
-  const allOcc=DB.filter(r=>lemmatise(r.word)===lemma).map(r=>r.pos);
+  const allOcc=DB.filter(r=>r.lemma===lemma).map(r=>r.pos);
   const occIdx=allOcc.indexOf(pos);
   info.textContent=`"${word}" · pos ${pos}${allOcc.length>1?' (occ '+(occIdx+1)+'/'+allOcc.length+')':''}`;
 
@@ -439,9 +443,9 @@ function playContext(pos, word, window=12, triggerRow){
     const sp=document.createElement('span');
     const isTarget=i===pos;
     const isOtherOcc=allOcc.includes(i)&&!isTarget;
-    const isStop=STOPS.has(lemmatise(r.word));
+    const isStop=STOPS.has(r.lemma);
     sp.className='ctx-word '+(isTarget?'ctx-target':isOtherOcc?'ctx-other':isStop?'ctx-stop':'ctx-content');
-    sp.textContent=r.word+' ';
+    sp.textContent=r.lemma+' ';
     if(isTarget) sp.id='ctx-target-word';
     scroll.appendChild(sp);
   }
