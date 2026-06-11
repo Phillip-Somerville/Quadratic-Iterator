@@ -4,145 +4,283 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alice — Iterator Stream Database</title>
+<title>Iterator Procedural DB v3</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=New+York:opsz,wght@6,400;6,500&display=swap');
   :root {
     --bg:#f2f2f7; --surface:rgba(255,255,255,0.72); --border:rgba(0,0,0,0.08);
     --border2:rgba(0,0,0,0.05); --text:#1c1c1e; --muted:#8e8e93;
     --blue:#007aff; --green:#34c759; --red:#ff3b30; --orange:#ff9500;
+    --indigo:#5856d6;
     --mono:'JetBrains Mono',monospace; --serif:'New York','Georgia',serif;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:12.5px;min-height:100vh;padding:32px 24px;-webkit-font-smoothing:antialiased;}
-  h1{font-family:var(--serif);font-size:22px;font-weight:500;margin-bottom:6px;}
+  h1{font-family:var(--serif);font-size:22px;font-weight:500;margin-bottom:4px;}
   .subtitle{color:var(--muted);font-size:11px;margin-bottom:24px;}
-  .card{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
-  .search-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;}
-  input[type=text]{flex:1;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:9px 12px;outline:none;transition:border-color .15s,box-shadow .15s;}
-  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.12);}
-  .mode-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-  .mode-btn{background:rgba(118,118,128,0.1);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:5px 11px;cursor:pointer;transition:all .12s;}
-  .mode-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
-  button.go{background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;padding:9px 18px;cursor:pointer;transition:opacity .12s;}
-  button.go:hover{opacity:.88;}
-  button.go:disabled{opacity:.4;cursor:default;}
-  .stat-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;}
-  .stat{background:rgba(118,118,128,0.06);border-radius:8px;padding:8px 12px;}
-  .stat-k{color:var(--muted);font-size:10px;display:block;}
+  .card{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .sec{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+  .stat-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .stat{border-radius:8px;padding:8px 12px;}
+  .stat-k{font-size:10px;display:block;margin-bottom:2px;}
   .stat-v{font-weight:600;font-size:12px;}
-  .c-blue{color:var(--blue);} .c-green{color:var(--green);} .c-red{color:var(--red);} .c-orange{color:var(--orange);}
-  .tbl-wrap{border-radius:10px;overflow:hidden;border:1px solid var(--border);}
-  .tbl-scroll{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,0.1) transparent;}
+  /* index role badges */
+  .badge{display:inline-block;font-size:9px;font-weight:600;letter-spacing:.5px;padding:2px 6px;border-radius:4px;text-transform:uppercase;vertical-align:middle;margin-left:5px;}
+  .badge-primary{background:rgba(0,122,255,0.12);color:var(--blue);}
+  .badge-vocab{background:rgba(88,86,214,0.12);color:var(--indigo);}
+  .badge-secondary{background:rgba(142,142,147,0.14);color:var(--muted);}
+  /* arch diagram */
+  .arch{background:rgba(0,122,255,0.04);border:1px solid rgba(0,122,255,0.12);border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:11px;line-height:2;}
+  .arch-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .arch-path{color:var(--blue);font-weight:600;}
+  .arch-ann{color:var(--muted);}
+  .arch-sep{color:rgba(0,0,0,0.18);margin:0 2px;}
+  /* traversal */
+  .trav-panel{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+  .trav-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .trav-title{font-size:11px;font-weight:600;}
+  .trav-engine{font-size:10px;color:var(--blue);background:rgba(0,122,255,0.08);border:1px solid rgba(0,122,255,0.18);border-radius:5px;padding:2px 7px;}
+  .trav-status{font-size:10px;color:var(--muted);margin-left:auto;}
+  .trav-text{font-family:var(--serif);font-size:15px;line-height:1.7;word-break:break-word;height:calc(1.7em * 3);overflow:hidden;position:relative;}
+  .tw{display:inline;padding:1px 3px;border-radius:3px;margin:0 1px;cursor:pointer;transition:background .15s,color .15s;}
+  .tw-active{background:rgba(0,122,255,0.18);color:var(--blue);font-weight:600;}
+  .tw-done{color:var(--text);}
+  .tw-stop{color:var(--muted);}
+  .trav-foot{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .trav-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:10px;padding:3px 9px;cursor:pointer;font-family:var(--mono);transition:all .12s;}
+  .trav-btn:hover{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .digest-readout{font-size:10px;color:var(--muted);margin-left:auto;text-align:right;font-family:var(--mono);}
+  /* entry digest input */
+  .entry-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+  .entry-input{flex:1;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px;outline:none;transition:border-color .15s;}
+  .entry-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.10);}
+  .entry-label{font-size:10px;color:var(--muted);white-space:nowrap;}
+  /* search */
+  .mode-row{display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap;}
+  .mode-btn{background:rgba(118,118,128,0.1);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:var(--mono);font-size:11px;padding:5px 10px;cursor:pointer;transition:all .12s;}
+  .mode-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .search-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  input[type=text]{flex:1;background:rgba(118,118,128,0.08);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:8px 12px;outline:none;transition:border-color .15s;}
+  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.10);}
+  button.go{background:var(--blue);border:none;border-radius:8px;color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;padding:9px 16px;cursor:pointer;transition:opacity .12s;white-space:nowrap;}
+  button.go:hover{opacity:.88;}
+  .hint{color:var(--muted);font-size:10px;margin-bottom:8px;line-height:1.5;}
+  /* tables */
+  .tbl-wrap{border-radius:9px;overflow:hidden;border:1px solid var(--border);}
+  .tbl-scroll{max-height:280px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,0.1) transparent;}
   table{width:100%;border-collapse:collapse;font-size:11px;}
-  th{color:var(--muted);font-size:10px;letter-spacing:.6px;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(242,242,247,0.95);backdrop-filter:blur(8px);font-weight:500;}
+  th{color:var(--muted);font-size:10px;letter-spacing:.5px;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(242,242,247,0.95);backdrop-filter:blur(8px);font-weight:500;}
   td{padding:4px 12px;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid var(--border2);}
   tr:last-child td{border-bottom:none;} tr:hover td{background:rgba(0,0,0,0.02);}
-  tr.highlight td{background:rgba(0,122,255,0.06);}
-  tr.highlight td:first-child{border-left:2px solid var(--blue);}
-  .loading{color:var(--muted);font-size:11px;padding:12px;text-align:center;}
-  .empty{color:var(--muted);font-size:11px;padding:16px;text-align:center;}
+  tr.hl td{background:rgba(0,122,255,0.05);} tr.hl td:first-child{border-left:2px solid var(--blue);}
+  /* launch-from-here button inline in table */
+  .launch-btn{background:none;border:1px solid rgba(0,122,255,0.3);border-radius:4px;color:var(--blue);font-size:9px;padding:2px 7px;cursor:pointer;font-family:var(--mono);transition:all .12s;white-space:nowrap;}
+  .launch-btn:hover{background:var(--blue);color:#fff;}
+  /* inversion panel */
+  .inv-panel{border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:11px;}
+  .inv-ok{background:rgba(52,199,89,0.07);border:1px solid rgba(52,199,89,0.25);}
+  .inv-fail{background:rgba(255,59,48,0.07);border:1px solid rgba(255,59,48,0.25);}
+  .inv-title{font-weight:600;margin-bottom:10px;}
+  .inv-row{display:flex;gap:8px;align-items:baseline;margin-bottom:5px;}
+  .inv-k{color:var(--muted);width:170px;flex-shrink:0;font-size:10px;}
+  .chip{font-family:var(--mono);font-size:10px;background:rgba(118,118,128,0.08);border-radius:4px;padding:2px 7px;}
   .jbar{display:inline-flex;gap:1px;vertical-align:middle;}
   .jb{width:4px;height:10px;border-radius:1px;display:inline-block;}
-  .jb-ctl{background:var(--red);opacity:.7;} .jb-tgt{background:var(--blue);opacity:.6;}
-  .section-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+  .jb-ctl{background:var(--red);opacity:.6;}.jb-tgt{background:var(--blue);opacity:.5;}
+  .c-blue{color:var(--blue);}.c-green{color:var(--green);}.c-red{color:var(--red);}
+  .hidden{display:none;}
   .build-progress{background:rgba(0,122,255,0.08);border:1px solid rgba(0,122,255,0.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:11px;color:var(--blue);}
   .progress-bar{height:3px;background:rgba(0,122,255,0.15);border-radius:2px;margin-top:8px;overflow:hidden;}
   .progress-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .1s;}
-  .hidden{display:none;}
-  .context-strip{background:var(--surface);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;overflow:hidden;position:relative;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
-  .context-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
-  .context-scroll{white-space:nowrap;overflow:hidden;font-family:var(--serif);font-size:15px;line-height:1.5;position:relative;}
-  .ctx-word{display:inline;padding:1px 2px;border-radius:3px;margin:0 1px;}
-  .ctx-target{background:rgba(0,122,255,0.15);color:var(--blue);font-weight:600;border-radius:4px;padding:1px 4px;}
-  .ctx-other{background:rgba(0,122,255,0.06);color:var(--blue);border-radius:3px;padding:1px 2px;}
-  .ctx-stop{color:var(--muted);}
-  .ctx-content{color:var(--text);}
-  .context-strip.hidden{display:none;}
-  .play-btn{background:none;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:10px;padding:2px 7px;cursor:pointer;font-family:var(--mono);transition:all .12s;white-space:nowrap;}
-  .play-btn:hover{background:var(--blue);border-color:var(--blue);color:#fff;}
 </style>
 </head>
 <body>
 
-<h1>Alice in Wonderland — Ch. 1</h1>
-<p class="subtitle">Continuous iterator stream · 1010 words · entry/exit digest per occurrence · three search modes</p>
+<h1>Iterator Procedural DB <span style="color:var(--muted);font-weight:300">v3</span></h1>
+<p class="subtitle">
+  CHAIN_INDEX: entryKey → { wordId · exitDigest · N · jHang · absJPacked } &nbsp;·&nbsp;
+  VOCAB: wordId → lemma &nbsp;·&nbsp;
+  LEMMA_INDEX: lemma → [ entryKey ]<br>
+  Runtime playback is performed only by repeated exact-key lookup in CHAIN_INDEX. Each record emits one word through VOCAB and supplies the next key by dkey(exitDigest). Secondary indexes locate entry keys but never emit or advance the stream.
+</p>
 
 <div id="build-progress" class="build-progress">
-  <span id="build-msg">Building iterator stream… 0 / 1010 words</span>
+  <span id="build-msg">Building… 0 words</span>
   <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
 </div>
 
 <div id="main" class="hidden">
 
-  <div class="card">
-    <div class="stat-row" id="global-stats"></div>
-    <div class="section-title">Search</div>
-    <div class="mode-row">
-      <button class="mode-btn active" onclick="setMode('lemma')" id="m-lemma">Lemma</button>
-      <button class="mode-btn" onclick="setMode('phrase')" id="m-phrase">Phrase → digest</button>
-      <button class="mode-btn" onclick="setMode('proximity')" id="m-proximity">Digest proximity</button>
-      <button class="mode-btn" onclick="setMode('jstats')" id="m-jstats">J-stream stats</button>
-    </div>
-    <div class="search-row">
-      <input type="text" id="query" placeholder="alice" onkeydown="if(event.key==='Enter')search()">
-      <button class="go" onclick="search()">Search</button>
-    </div>
-    <div id="mode-hint" style="color:var(--muted);font-size:10px;margin-top:-6px;margin-bottom:10px;">Find all occurrences of a word (lemmatised) in the stream</div>
-  </div>
+<!-- Architecture + stats -->
 
-  <div id="context-strip" class="context-strip hidden">
-    <div class="context-label">Context — <span id="ctx-info"></span> &nbsp;·&nbsp; <span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="stopScroll()">■ stop</span> &nbsp;·&nbsp; <span style="color:var(--muted);font-size:10px;cursor:pointer" onclick="restartScroll()">▶ restart</span></div>
-    <div class="context-scroll" id="ctx-scroll"></div>
-  </div>
-
-  <div class="card" id="results-card" style="display:none">
-    <div class="section-title" id="results-title">Results</div>
-    <div class="tbl-wrap">
-      <div class="tbl-scroll">
-        <table id="results-table">
-          <thead id="results-head"></thead>
-          <tbody id="results-body"></tbody>
-        </table>
-      </div>
+<div class="card">
+  <div class="arch">
+    <div class="arch-row">
+      <span class="arch-path">CHAIN_INDEX</span><span class="badge badge-primary">primary · retrieve · emit · advance</span>
+      <span class="arch-ann">entryDigest → { wordId · exitDigest · N · jHang · absJPacked }</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-path">VOCAB</span><span class="badge badge-vocab">vocabulary · decode</span>
+      <span class="arch-ann">wordId → lemma &nbsp;·&nbsp; WORD_TO_ID: lemma → wordId &nbsp;·&nbsp; unique words only</span>
+    </div>
+    <div class="arch-row">
+      <span class="arch-path">LEMMA_INDEX</span><span class="badge badge-secondary">secondary · search · locate · jump</span>
+      <span class="arch-ann">lemma → [ entryKey, … ] &nbsp;·&nbsp; returns entry keys only — not the playback path</span>
+    </div>
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,122,255,0.12);line-height:2">
+      <span class="arch-ann" style="font-weight:600">Forward:&nbsp;</span><span class="arch-path" style="font-size:11px">key → CHAIN_INDEX.get(key) → VOCAB[wordId] → key = dkey(exitDigest) → repeat</span><br>
+      <span class="arch-ann" style="font-weight:600">Reverse:&nbsp;</span><span class="arch-path" style="font-size:11px">exitDigest + N + jHang + absJPacked → invertWord() → recovered entryDigest</span><br>
+      <span class="arch-ann">Corpus text compiles the indexes at build time. Runtime playback emits from CHAIN_INDEX + VOCAB only.</span>
     </div>
   </div>
-
-  <div class="card">
-    <div class="section-title">Top content words</div>
-    <div class="tbl-wrap">
-      <div class="tbl-scroll">
-        <table>
-          <thead><tr><th>lemma</th><th>freq</th><th>N range</th><th>J profile (first occ)</th></tr></thead>
-          <tbody id="vocab-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
+  <div class="stat-row" id="global-stats"></div>
 </div>
 
+<!-- Traversal -->
+
+<div class="trav-panel">
+  <div class="trav-header">
+    <span class="trav-title">Digest-chain traversal</span>
+    <span class="trav-engine">CHAIN_INDEX.get(key)</span>
+    <span class="trav-status" id="trav-status">—</span>
+  </div>
+  <div class="trav-text" id="trav-text"></div>
+  <div class="entry-row">
+    <span class="entry-label">entry digest</span>
+    <input class="entry-input" type="text" id="entry-input" placeholder="0.08780100000000 — or click any word above">
+    <button class="trav-btn" onclick="travFromInput()" style="padding:5px 12px">jump</button>
+  </div>
+  <div class="trav-foot">
+    <button class="trav-btn" onclick="travPlay()">▶ play</button>
+    <button class="trav-btn" onclick="travStop()">■ stop</button>
+    <button class="trav-btn" onclick="travReset()">↺ SEED</button>
+    <button class="trav-btn" onclick="travStep()">step →</button>
+    <div class="digest-readout" id="digest-readout">—</div>
+  </div>
+</div>
+
+<!-- Search -->
+
+<div class="card">
+  <div class="mode-row">
+    <button class="mode-btn active" onclick="setMode('lemma')"  id="m-lemma">Lemma</button>
+    <button class="mode-btn"        onclick="setMode('invert')" id="m-invert">Invert</button>
+    <button class="mode-btn"        onclick="setMode('digest')" id="m-digest">Digest probe</button>
+    <button class="mode-btn"        onclick="setMode('vocab')"  id="m-vocab">Vocab</button>
+  </div>
+  <div class="search-row">
+    <input type="text" id="query" placeholder="alice" onkeydown="if(event.key==='Enter')doSearch()">
+    <button class="go" onclick="doSearch()">Go</button>
+  </div>
+  <div class="hint" id="mode-hint"></div>
+</div>
+
+<!-- Inversion panel -->
+
+<div id="inv-panel" class="inv-panel hidden"></div>
+
+<!-- Results -->
+
+<div class="card hidden" id="results-card">
+  <div class="sec" id="results-title">Results</div>
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table><thead id="res-head"></thead><tbody id="res-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+</div><!-- #main -->
+
 <script>
-// ── ITERATOR ─────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ITERATOR CORE
+// ═══════════════════════════════════════════════════════════════
 const PL=1.094, D=0.002, T=0.08781, SEED=0.087801;
-function tr14(x){return Math.round(x*1e14)/1e14;}
-function sgn(x){return x>0?1:x<0?-1:0;}
-function step(h,f){const v=h*h-f;return tr14(v*v-f);}
+function tr14(x){ return Math.round(x*1e14)/1e14; }
+function sgn(x){ return x>0?1:x<0?-1:0; }
+function iterStep(h,f){ const v=h*h-f; return tr14(v*v-f); }
 function interrogate(h1,h2){
-  const Fp=h1>T?PL+D:PL,inn=h1+Fp;
-  if(inn>=0){const v2=Fp-Math.sqrt(inn);if(v2>=0)return sgn(tr14(Math.sqrt(v2))-h2);}
+  const Fp=h1>T?PL+D:PL, inn=h1+Fp;
+  if(inn>=0){ const v2=Fp-Math.sqrt(inn); if(v2>=0) return sgn(tr14(Math.sqrt(v2))-h2); }
   return sgn(h1-h2);
 }
-function jHangOf(h1,h2){
-  const Fp=h1>T?PL+D:PL,inn=h1+Fp;
-  if(inn>=0){const v2=Fp-Math.sqrt(inn);if(v2>=0)return sgn(tr14(Math.sqrt(v2))-h2);}
-  return sgn(h1-h2);
+function dkey(x){ return x.toFixed(14); }
+function payloadBits(w){
+  const bits=[];
+  for(const b of new TextEncoder().encode(w))
+    for(let i=7;i>=0;i--)bits.push((b>>i)&1);
+  return bits;
+}
+function encodeWord(bits, entry, h2prev){
+  let hp2=h2prev, hp=entry; const absJ=[]; let bi=0;
+  const f0=PL+bits[bi++]*D;
+  let hc=iterStep(hp,f0); absJ.push(0);
+  while(bi<bits.length){
+    const j=interrogate(hc,hp);
+    const f=j===0?PL+bits[bi++]*D:(j===1?PL+D:PL);
+    hp2=hp; hp=hc; hc=iterStep(hp,f); absJ.push(Math.abs(j));
+  }
+  return {exit:hc, N:absJ.length, jHang:interrogate(hc,hp), absJ};
+}
+function invertWord(exit, N, jHang, absJ){
+  let anchor=exit, prev=exit;
+  { const up=anchor>T,Fp=up?PL+D:PL,k=tr14(Math.sqrt(Fp-Math.sqrt(anchor+Fp)));
+    const rec=jHang===0?k:tr14(k-jHang*1e-14); prev=anchor; anchor=rec; }
+  for(let i=2;i<=N;i++){
+    const n=N-i+1, up=anchor>T, Fp=up?PL+D:PL;
+    const k=tr14(Math.sqrt(Fp-Math.sqrt(anchor+Fp)));
+    const jac=n<absJ.length?absJ[n]:0, pu=prev>T;
+    const js=jac===0?0:(pu?1:-1);
+    const rec=jac===0?k:tr14(k-js*1e-14);
+    prev=anchor; anchor=rec;
+  }
+  return {entry:anchor};
 }
 
+// ═══════════════════════════════════════════════════════════════
+// THREE-TABLE DATABASE
+// ═══════════════════════════════════════════════════════════════
+//
+// CHAIN_INDEX  [primary]   Map<dkey(entry), record>
+//   record: { wordId, exitDigest, N, jHang, absJPacked, absJLen }
+//   absJPacked: absJ bits packed into a Uint32Array, absJLen: bit count
+//   — the only structure used for forward traversal
+//
+// VOCAB        [vocabulary] Map<wordId, lemma>  — decodes IDs → lemma
+// WORD_TO_ID   [vocabulary] Map<lemma, wordId>  — compiles lemma → ID (no scan)
+//
+// LEMMA_INDEX  [secondary]  Map<lemma, entryKey[]>
+//   — maps a word to the set of entry digests where it appears
+//   — used only to locate chain entry points for search/UI
+//   — NEVER used as playback source
 
-// ── LEMMATISER — identity, lowercase only ────────────────────────────────────
-// No normalisation. Every surface form is its own distinct iterator payload.
-// "thought", "think", "thinking" are three separate words with separate paths.
+const CHAIN_INDEX = new Map();
+const VOCAB       = new Map();   // wordId → lemma
+const WORD_TO_ID  = new Map();   // lemma → wordId  (reverse; avoids scan)
+const LEMMA_INDEX = new Map();
+
+let nextId=0;
+function getWordId(l){
+  if(WORD_TO_ID.has(l)) return WORD_TO_ID.get(l);
+  const id=nextId++;
+  VOCAB.set(id,l);
+  WORD_TO_ID.set(l,id);
+  return id;
+}
+
+// Pack absJ boolean array into Uint32Array; unpack for display
+function packAbsJ(absJ){
+  const len=absJ.length;
+  const words=new Uint32Array(Math.ceil(len/32));
+  for(let i=0;i<len;i++) if(absJ[i]) words[i>>5]|=(1<<(i&31));
+  return {packed:words, len};
+}
+function unpackAbsJ(packed, len){
+  const out=new Array(len);
+  for(let i=0;i<len;i++) out[i]=(packed[i>>5]>>>(i&31))&1;
+  return out;
+}
 
 const STOPS=new Set(['the','a','an','and','or','but','in','on','at','to','for','of',
   'with','by','from','as','be','was','were','is','am','are','been',
@@ -153,340 +291,387 @@ const STOPS=new Set(['the','a','an','and','or','but','in','on','at','to','for','
   'very','just','there','here','up','out','if','about','into','then',
   'now','own','same','such','also','after','before','over','under','again',
   'once','more','most','other','some','any','said','got','went','came']);
+function tokenise(t){ return (t.match(/[a-zA-Z']+/g)||[]).map(s=>s.replace(/^'+|'+$/g,'')).filter(s=>s.length>0); }
 
-function lemmatise(w){ return w.toLowerCase(); }
-function tokenise(text){return (text.match(/[a-zA-Z']+/g)||[]).map(t=>t.replace(/^'+|'+$/g,'')).filter(t=>t.length>0);}
-
-// ── PAYLOAD BITS ──────────────────────────────────────────────────────────────
-function payloadBits(word){
-  const bits=[];
-  for(const b of new TextEncoder().encode(word))
-    for(let i=7;i>=0;i--)bits.push((b>>i)&1);
-  return bits;
-}
-
-// ── ENCODE WORD SLICE ─────────────────────────────────────────────────────────
-function encodeWord(bits, hPrev, hPrev2){
-  const absJ=[];
-  let h=[hPrev2, hPrev]; // h[-2], h[-1] equivalents
-  // n=1: always target
-  let bi=0;
-  const fn0=PL+bits[bi++]*D;
-  const h1=step(h[1],fn0); h.push(h1); absJ.push(0);
-  // n>=2
-  while(bi<bits.length){
-    const h_1=h[h.length-1], h_2=h[h.length-2];
-    const j=interrogate(h_1,h_2);
-    const fn=j===0?PL+bits[bi++]*D:(j===1?PL+D:PL);
-    h.push(step(h_1,fn)); absJ.push(Math.abs(j));
-  }
-  const exit=h[h.length-1];
-  const jH=jHangOf(h[h.length-1],h[h.length-2]);
-  return {exit, absJ, jHang:jH, N:absJ.length};
-}
-
-// ── DATABASE — canonical: pos · lemma · entry · N ────────────────────────────
-// lemma: minimal semantic token
-// entry: orbit state at word boundary (entry edge)
-// N:     traversal depth — unique per instance, varies by orbit context
-// exit, absJ, jHang: all derived on demand from (lemma, entry, N)
-// Cross-word chain: exit[i] == entry[i+1] by construction
-let DB=[];  // [{pos, lemma, entry, N}]
+// Also maintain an ordered chain of entry digests for the traversal walker
+// (this is just an array of keys in insertion order — not used to emit words,
+//  only to pre-render spans so the user can click any position)
+let CHAIN_ORDER = [];  // [entryKey] — render/cache only, not playback
+let COLLISIONS  = 0;   // entry digest collisions at build time — expected: 0
 
 function buildDB(text){
   return new Promise(resolve=>{
+    CHAIN_INDEX.clear(); VOCAB.clear(); WORD_TO_ID.clear(); LEMMA_INDEX.clear();
+    CHAIN_ORDER=[]; COLLISIONS=0; nextId=0;
     const words=tokenise(text);
     const total=words.length;
-    let done=0;
-    const chunk=50;
-    let h2=SEED, h1=SEED;
+    const CHUNK=50;
+    let hCur=SEED, hPrev=SEED;
 
-    function processChunk(start){
-      const end=Math.min(start+chunk,total);
+    function chunk(start){
+      const end=Math.min(start+CHUNK,total);
       for(let i=start;i<end;i++){
-        const word=words[i];
-        const lemma=lemmatise(word);
-        const entry=h1;
-        const bits=payloadBits(lemma);  // encode lemma, not raw word
-        const r=encodeWord(bits,h1,h2);
-        DB.push({pos:i, lemma, entry, N:r.N});
-        h2=h1; h1=r.exit; done++;
+        const lemma=words[i].toLowerCase();
+        const bits=payloadBits(lemma);
+        const entry=hCur;
+        const r=encodeWord(bits,entry,hPrev);
+        const wordId=getWordId(lemma);
+        const {packed, len}=packAbsJ(r.absJ);
+        // PRIMARY: CHAIN_INDEX — keyed by entry digest string
+        const ek=dkey(entry);
+        if(CHAIN_INDEX.has(ek)) COLLISIONS++;
+        CHAIN_INDEX.set(ek,{wordId, exitDigest:r.exit, N:r.N, jHang:r.jHang, absJPacked:packed, absJLen:len});
+        CHAIN_ORDER.push(ek);
+        // SECONDARY: LEMMA_INDEX — stores entry keys, not floats
+        if(!LEMMA_INDEX.has(lemma)) LEMMA_INDEX.set(lemma,[]);
+        LEMMA_INDEX.get(lemma).push(ek);
+        hPrev=hCur; hCur=r.exit;
       }
-      const pct=Math.round(done/total*100);
-      document.getElementById('build-msg').textContent=`Building iterator stream… ${done} / ${total} words`;
-      document.getElementById('prog').style.width=pct+'%';
-      if(end<total) setTimeout(()=>processChunk(end),0);
+      document.getElementById('build-msg').textContent=`Building… ${end} / ${total} words`;
+      document.getElementById('prog').style.width=Math.round(end/total*100)+'%';
+      if(end<total) setTimeout(()=>chunk(end),4);
       else resolve();
     }
-    processChunk(0);
+    chunk(0);
   });
 }
 
-// Derive full record on demand from stored (lemma, entry, N)
-// h2 = entry of previous record (cross-word chain continuity)
-function derive(rec){
-  const bits=payloadBits(rec.lemma);
-  const h2=rec.pos>0?DB[rec.pos-1].entry:SEED;
-  const r=encodeWord(bits,rec.entry,h2);
-  const isStop=STOPS.has(rec.lemma);
-  // Verify depth matches stored N
-  const depthMatch=r.N===rec.N;
-  return {...rec, exit:r.exit, absJ:r.absJ, jHang:r.jHang,
-          isStop, depthMatch, word:rec.lemma};
+// ═══════════════════════════════════════════════════════════════
+// TRAVERSAL ENGINE — key-native, CHAIN_INDEX only
+// ═══════════════════════════════════════════════════════════════
+// State: TRAV.key — exact CHAIN_INDEX key string (14dp decimal)
+// Forward step: CHAIN_INDEX.get(key) → record → key = dkey(exitDigest)
+// No float stored in traversal state. No dkey(float) in the advance loop.
+// TRAV.allSteps: render/cache helper only — never drives travAdvance().
+
+let TRAV = {key: dkey(SEED), timer: null, allSteps: []};
+const WINDOW_BEFORE=8, WINDOW_AFTER=20;
+
+function travBuild(startKey){
+  travStop();
+  // Walk chain from SEED by key — render cache only
+  const steps=[];
+  const seen=new Set();
+  let key=dkey(SEED);
+  while(true){
+    if(seen.has(key)) break;
+    seen.add(key);
+    const rec=CHAIN_INDEX.get(key);
+    if(!rec) break;
+    steps.push({key, rec, lemma:VOCAB.get(rec.wordId)});
+    key=dkey(rec.exitDigest);  // only float→key conversion in the chain
+  }
+  TRAV.allSteps=steps;
+  TRAV.key=startKey;
+  document.getElementById('trav-status').textContent=
+    `${steps.length} words · CHAIN_INDEX.get(key) · key = dkey(exitDigest)`;
+  travRenderAtKey(startKey);
 }
 
-// ── SEARCH MODES ──────────────────────────────────────────────────────────────
-let mode='lemma';
-const hints={
-  lemma:'Find all occurrences of a word (lemmatised) in the stream',
-  phrase:'Encode phrase as iterator stream → find nearest exit digests in chapter',
-  proximity:'Enter a digest value (14dp) → find nearest entry/exit positions',
-  jstats:'J-stream statistics across all occurrences of a word'
+function travRenderAtKey(key){
+  const rec=CHAIN_INDEX.get(key);
+  const container=document.getElementById('trav-text');
+  const activeIdx=TRAV.allSteps.findIndex(s=>s.key===key);
+  if(activeIdx===-1){
+    container.innerHTML=`<span style="color:var(--red);font-size:11px">key not in rendered chain: ${key}</span>`;
+    document.getElementById('digest-readout').textContent=`${key} — not found in chain`;
+    document.getElementById('trav-status').textContent='key not in chain';
+    return;
+  }
+  const from=Math.max(0, activeIdx-WINDOW_BEFORE);
+  const to=Math.min(TRAV.allSteps.length-1, activeIdx+WINDOW_AFTER);
+  const win=TRAV.allSteps.slice(from, to+1);
+  container.innerHTML='';
+  if(from>0){
+    const el=document.createElement('span');
+    el.style.cssText='color:var(--muted);font-size:11px;margin-right:4px;';
+    el.textContent='… '; container.appendChild(el);
+  }
+  win.forEach(s=>{
+    const sp=document.createElement('span');
+    sp.className='tw '+(s.key===key?'tw-active':STOPS.has(s.lemma)?'tw-stop':'tw-done');
+    sp.textContent=s.lemma+' ';
+    sp.title=`entry key: ${s.key}\nexit: ${s.rec.exitDigest.toFixed(10)}\nN=${s.rec.N}`;
+    sp.onclick=()=>{ travStop(); TRAV.key=s.key; travRenderAtKey(TRAV.key); };
+    container.appendChild(sp);
+  });
+  if(to<TRAV.allSteps.length-1){
+    const el=document.createElement('span');
+    el.style.cssText='color:var(--muted);font-size:11px;';
+    el.textContent=' …'; container.appendChild(el);
+  }
+  if(rec){
+    document.getElementById('digest-readout').textContent=
+      `key: ${key} · exit: ${rec.exitDigest.toFixed(10)} · N=${rec.N} · jHang ${rec.jHang>=0?'+':''}${rec.jHang} · pos ${activeIdx}`;
+    document.getElementById('entry-input').value=key;
+  } else {
+    document.getElementById('digest-readout').textContent=`${key} — end of chain`;
+  }
+}
+
+// The procedural core: key → record → key = dkey(exitDigest)
+function travAdvance(){
+  const rec=CHAIN_INDEX.get(TRAV.key);
+  if(!rec){ travStop(); return false; }
+  TRAV.key=dkey(rec.exitDigest);
+  travRenderAtKey(TRAV.key);
+  return true;
+}
+function travPlay(){ if(TRAV.timer) return; TRAV.timer=setInterval(()=>{ if(!travAdvance()) travStop(); },130); }
+function travStop(){ if(TRAV.timer){clearInterval(TRAV.timer);TRAV.timer=null;} }
+function travStep(){ travStop(); travAdvance(); }
+function travReset(){
+  travStop(); TRAV.key=dkey(SEED);
+  travRenderAtKey(TRAV.key); document.getElementById('entry-input').value=TRAV.key;
+}
+function travFromInput(){
+  travStop();
+  const raw=document.getElementById('entry-input').value.trim();
+  // Try exact key first
+  if(CHAIN_INDEX.has(raw)){ TRAV.key=raw; travRenderAtKey(TRAV.key); return; }
+  // Fall back: parse float, find nearest key in CHAIN_ORDER
+  const val=parseFloat(raw); if(isNaN(val)) return;
+  let bestKey=null, bestDist=Infinity;
+  for(const k of CHAIN_ORDER){ const dist=Math.abs(parseFloat(k)-val); if(dist<bestDist){bestDist=dist;bestKey=k;} }
+  if(bestKey){ TRAV.key=bestKey; travRenderAtKey(TRAV.key); document.getElementById('entry-input').value=bestKey; }
+}
+
+// Launch from exact CHAIN_INDEX key — called from search result buttons
+function launchFromKey(k){
+  travStop();
+  if(!CHAIN_INDEX.has(k)){
+    document.getElementById('trav-status').textContent=`key not in CHAIN_INDEX: ${k}`;
+    return;
+  }
+  TRAV.key=k;
+  travRenderAtKey(TRAV.key);
+  document.getElementById('trav-text').scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('entry-input').value=k;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SEARCH MODES
+// ═══════════════════════════════════════════════════════════════
+const MODE_HINTS={
+  lemma: `LEMMA_INDEX.get(lemma) → entry keys → CHAIN_INDEX.get(key) → record<br>
+          Click <em>launch →</em> to start traversal from that entry key`,
+  invert:`CHAIN_INDEX.get(key) → { exitDigest, N, jHang, absJPacked } → invertWord()<br>
+          No re-encoding. No positional context. Stored record only.`,
+  digest:`Nearest entry keys in CHAIN_INDEX — probe orbit topology by digest value`,
+  vocab: `VOCAB — unique lemmas · frequencies via LEMMA_INDEX.get(lemma).length`
 };
+
+let mode='lemma';
 function setMode(m){
   mode=m;
-  ['lemma','phrase','proximity','jstats'].forEach(x=>{
+  ['lemma','invert','digest','vocab'].forEach(x=>{
     document.getElementById('m-'+x).className='mode-btn'+(x===m?' active':'');
   });
-  const ph={lemma:'alice',phrase:'down the rabbit hole',proximity:'0.08871801461829',jstats:'rabbit'};
-  document.getElementById('query').placeholder=ph[m];
-  document.getElementById('mode-hint').textContent=hints[m];
-  document.getElementById('results-card').style.display='none';
+  document.getElementById('query').placeholder={lemma:'alice',invert:'rabbit',digest:'0.08781000',vocab:''}[m];
+  document.getElementById('mode-hint').innerHTML=MODE_HINTS[m];
+  document.getElementById('results-card').classList.add('hidden');
+  document.getElementById('inv-panel').classList.add('hidden');
 }
 
-function search(){
+function doSearch(){
   const q=document.getElementById('query').value.trim();
-  if(!q)return;
-  if(mode==='lemma')     searchLemma(q);
-  else if(mode==='phrase')    searchPhrase(q);
-  else if(mode==='proximity') searchProximity(q);
-  else if(mode==='jstats')    searchJStats(q);
+  if(mode==='vocab'){ modeVocab(); return; }
+  if(!q) return;
+  if(mode==='lemma')  modeLemma(q);
+  else if(mode==='invert') modeInvert(q);
+  else if(mode==='digest') modeDigest(q);
 }
 
-function showTable(title,headers,rows,highlightFn){
-  document.getElementById('results-card').style.display='';
+function fmt(x){ return x.toFixed(14); }
+function fmtS(x){ return x.toFixed(10); }
+function jBar(absJ,max=48){
+  return '<span class="jbar">'+absJ.slice(0,max).map(v=>`<span class="jb ${v?'jb-ctl':'jb-tgt'}"></span>`).join('')+'</span>';
+}
+function jhCol(j){ return j===0?'var(--muted)':j>0?'var(--green)':'var(--red)'; }
+
+function showTable(title,headers,rows,hlFn){
+  document.getElementById('results-card').classList.remove('hidden');
   document.getElementById('results-title').textContent=title;
-  const head=document.getElementById('results-head');
-  const body=document.getElementById('results-body');
-  head.innerHTML='<tr>'+headers.map(h=>`<th>${h}</th>`).join('')+'<th></th></tr>';
+  document.getElementById('res-head').innerHTML='<tr>'+headers.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+  const body=document.getElementById('res-body');
   body.innerHTML='';
-  if(!rows.length){body.innerHTML='<tr><td colspan="'+(headers.length+1)+'" class="empty">No results</td></tr>';return;}
+  if(!rows.length){
+    body.innerHTML=`<tr><td colspan="${headers.length}" style="color:var(--muted);text-align:center;padding:14px">No results</td></tr>`;
+    return;
+  }
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    if(highlightFn&&highlightFn(r))tr.className='highlight';
+    if(hlFn&&hlFn(r)) tr.className='hl';
     tr.innerHTML=r.cells.map(c=>`<td>${c}</td>`).join('');
-    const td=document.createElement('td');
-    if(r.r&&r.r.pos!==undefined){
-      const btn=document.createElement('button');
-      btn.className='play-btn';
-      btn.textContent='▶ play';
-      btn.onclick=(e)=>{e.stopPropagation();playContext(r.r.pos,r.r.word,12,tr);};
-      td.appendChild(btn);
-      tr.style.cursor='pointer';
-      tr.onclick=()=>playContext(r.r.pos,r.r.word,12,tr);
-    }
-    tr.appendChild(td);
     body.appendChild(tr);
   });
   document.getElementById('results-card').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function jBar(absJ,max=40){
-  const slice=absJ.slice(0,max);
-  return '<span class="jbar">'+slice.map(v=>`<span class="jb ${v?'jb-ctl':'jb-tgt'}"></span>`).join('')+'</span>';
+// ── Lemma search — via LEMMA_INDEX → entry digests → CHAIN_INDEX
+function modeLemma(q){
+  const lemma=q.toLowerCase();
+  const entries=LEMMA_INDEX.get(lemma);
+  if(!entries||!entries.length){
+    showTable(`"${lemma}" not in LEMMA_INDEX`,[],[],()=>false);
+    return;
+  }
+  // For each entry key, pull full record from CHAIN_INDEX directly
+  const rows=entries.map((ek,i)=>{
+    const rec=CHAIN_INDEX.get(ek);
+    const launchId=`launch-${lemma}-${i}`;
+    return {
+      cells:[
+        i+1,
+        `<span class="c-blue">${lemma}</span>`,
+        `<span class="chip">${ek}</span>
+         <button class="launch-btn" id="${launchId}" onclick="launchFromKey('${ek}')">launch →</button>`,
+        `<span class="chip" style="color:var(--blue)">${fmtS(rec.exitDigest)}</span>`,
+        rec.N,
+        `<span style="color:${jhCol(rec.jHang)}">${rec.jHang>=0?'+':''}${rec.jHang}</span>`,
+        jBar(unpackAbsJ(rec.absJPacked, rec.absJLen))
+      ]
+    };
+  });
+  showTable(
+    `LEMMA_INDEX["${lemma}"] → ${rows.length} entry key${rows.length!==1?'s':''} → CHAIN_INDEX lookup`,
+    ['occ','lemma','entryKey (CHAIN_INDEX key)','exitDigest','N','jHang','absJPacked'],
+    rows,()=>false
+  );
 }
 
-function fmt(x){return x.toFixed(14);}
+// ── Invert — from stored record only
+function modeInvert(q){
+  const lemma=q.toLowerCase();
+  const entries=LEMMA_INDEX.get(lemma);
+  if(!entries||!entries.length){
+    const p=document.getElementById('inv-panel');
+    p.className='inv-panel inv-fail'; p.classList.remove('hidden');
+    p.innerHTML=`<div class="inv-title">✗ "${lemma}" not found</div>`; return;
+  }
+  const ek=entries[0];
+  const rec=CHAIN_INDEX.get(ek);
+  const absJ=unpackAbsJ(rec.absJPacked, rec.absJLen);
+  // Inversion: ONLY stored fields from CHAIN_INDEX record
+  const {entry:recEntry}=invertWord(rec.exitDigest, rec.N, rec.jHang, absJ);
+  const trueEntry=parseFloat(ek);
+  const residual=Math.abs(recEntry-trueEntry);
+  const ok=residual<1e-13;
 
-function searchLemma(q){
-  const lemma=lemmatise(q);
-  const rows=DB.filter(r=>r.lemma===lemma).map(r=>derive(r));
+  const p=document.getElementById('inv-panel');
+  p.className='inv-panel '+(ok?'inv-ok':'inv-fail'); p.classList.remove('hidden');
+  p.innerHTML=`
+    <div class="inv-title">${ok?'✓':'✗'} Inversion — "${lemma}" (first occurrence)</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px">
+      Source: CHAIN_INDEX.get("${ek}") — no re-encoding, no positional context
+    </div>
+    <div class="inv-row"><span class="inv-k">exitDigest (stored)</span><span class="chip c-blue">${fmt(rec.exitDigest)}</span></div>
+    <div class="inv-row"><span class="inv-k">N (stored)</span><span>${rec.N}</span></div>
+    <div class="inv-row"><span class="inv-k">jHang (stored)</span><span style="color:${jhCol(rec.jHang)}">${rec.jHang>=0?'+':''}${rec.jHang}</span><span style="color:var(--muted);font-size:10px;margin-left:8px">inversion sign only · not used in forward traversal</span></div>
+    <div class="inv-row"><span class="inv-k">absJPacked (${rec.absJLen} bits · ${rec.absJPacked.length}×u32)</span>${jBar(absJ,64)}</div>
+    <div class="inv-row" style="margin-top:10px"><span class="inv-k">recovered entryDigest</span><span class="chip" style="color:${ok?'var(--green)':'var(--red)'}">${fmt(recEntry)}</span></div>
+    <div class="inv-row"><span class="inv-k">true entryKey</span><span class="chip">${ek}</span></div>
+    <div class="inv-row"><span class="inv-k">residual</span>
+      <span style="color:${ok?'var(--green)':'var(--red)'};font-weight:600">${residual.toExponential(3)}</span>
+      &nbsp;${ok?'<span class="c-green">round-trip closed</span>':'<span class="c-red">failed</span>'}
+    </div>
+  `;
+  p.scrollIntoView({behavior:'smooth',block:'nearest'});
+  modeLemma(lemma);
+}
+
+// ── Digest probe
+function modeDigest(q){
+  const target=parseFloat(q); if(isNaN(target)) return;
+  const eps=2e-3;
+  const rows=[];
+  for(const [k,rec] of CHAIN_INDEX){
+    const dE=Math.abs(parseFloat(k)-target), dX=Math.abs(rec.exitDigest-target);
+    if(dE<eps||dX<eps) rows.push({k,rec,dE,dX});
+  }
+  rows.sort((a,b)=>Math.min(a.dE,a.dX)-Math.min(b.dE,b.dX));
   showTable(
-    `"${lemma}" — ${rows.length} occurrence${rows.length!==1?'s':''}`,
-    ['pos','lemma','entry digest','exit digest','N','J profile'],
-    rows.map(r=>({cells:[r.pos,r.lemma,fmt(r.entry),fmt(r.exit),r.N,jBar(r.absJ)],r})),
+    `Digest probe ${target.toFixed(8)} — ${Math.min(rows.length,20)} nearest`,
+    ['lemma','entryKey','Δentry','Δexit','N','jHang',''],
+    rows.slice(0,20).map(r=>({
+      cells:[
+        `<span class="${STOPS.has(VOCAB.get(r.rec.wordId))?'':'c-blue'}">${VOCAB.get(r.rec.wordId)}</span>`,
+        `<span class="chip">${r.k}</span>`,
+        r.dE<1e-13?'<span class="c-green">exact</span>':r.dE.toExponential(3),
+        r.dX<1e-13?'<span class="c-green">exact</span>':r.dX.toExponential(3),
+        r.rec.N,
+        `<span style="color:${jhCol(r.rec.jHang)}">${r.rec.jHang>=0?'+':''}${r.rec.jHang}</span>`,
+        `<button class="launch-btn" onclick="launchFromKey('${r.k}')">launch →</button>`
+      ],
+      exact:Math.min(r.dE,r.dX)<1e-13
+    })),
+    r=>r.exact
+  );
+}
+
+// ── Vocab table
+function modeVocab(){
+  const rows=[];
+  for(const [wId,lemma] of VOCAB){
+    const entries=LEMMA_INDEX.get(lemma)||[];
+    const Ns=entries.map(ek=>CHAIN_INDEX.get(ek)?.N).filter(Boolean);
+    const exits=entries.map(ek=>CHAIN_INDEX.get(ek)?.exitDigest).filter(Boolean);
+    const NMin=Math.min(...Ns), NMax=Math.max(...Ns);
+    const firstRec=CHAIN_INDEX.get(entries[0]);
+    rows.push({
+      wId, lemma, f:entries.length, NMin, NMax, exits, firstRec,
+      firstKey:entries[0]
+    });
+  }
+  rows.sort((a,b)=>b.f-a.f);
+  showTable(
+    `VOCAB — ${VOCAB.size} unique lemmas`,
+    ['wId','lemma','freq','N range','exit range','absJ (first occ)',''],
+    rows.slice(0,40).map(r=>({
+      cells:[
+        r.wId,
+        STOPS.has(r.lemma)?`<span style="color:var(--muted)">${r.lemma}</span>`:`<span class="c-blue">${r.lemma}</span>`,
+        r.f,
+        r.NMin===r.NMax?r.NMin:`${r.NMin}–${r.NMax}`,
+        r.exits.length>1?`${Math.min(...r.exits).toFixed(6)}…${Math.max(...r.exits).toFixed(6)}`:`${r.exits[0]?.toFixed(8)||'—'}`,
+        jBar(r.firstRec?unpackAbsJ(r.firstRec.absJPacked,r.firstRec.absJLen):[],32),
+        `<button class="launch-btn" onclick="launchFromKey('${r.firstKey}')">launch →</button>`
+      ]
+    })),
     ()=>false
   );
 }
 
-function searchPhrase(q){
-  const words=tokenise(q);
-  if(!words.length)return;
-  let h2=SEED, h1=SEED, phraseDigest=SEED;
-  for(const w of words){
-    const bits=payloadBits(lemmatise(w));
-    const r=encodeWord(bits,h1,h2);
-    h2=h1; h1=r.exit; phraseDigest=r.exit;
-  }
-  const eps=1e-3;
-  const scored=DB.map(r=>{
-    const d=derive(r);
-    return {...d, distEntry:Math.abs(d.entry-phraseDigest), distExit:Math.abs(d.exit-phraseDigest)};
-  }).filter(r=>r.distEntry<eps||r.distExit<eps)
-    .sort((a,b)=>Math.min(a.distEntry,a.distExit)-Math.min(b.distEntry,b.distExit))
-    .slice(0,15);
-  showTable(
-    `Phrase "${q}" → digest ${phraseDigest.toFixed(8)} — ${scored.length} near matches`,
-    ['pos','lemma','N','entry dist','exit dist'],
-    scored.map(r=>({cells:[r.pos,r.lemma,r.N,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
-    r=>Math.min(r.distEntry,r.distExit)<1e-5
-  );
-}
-
-function searchProximity(q){
-  const digest=parseFloat(q);
-  if(isNaN(digest))return;
-  const eps=1e-3;
-  const scored=DB.map(r=>{
-    const d=derive(r);
-    return {...d, distEntry:Math.abs(d.entry-digest), distExit:Math.abs(d.exit-digest)};
-  }).filter(r=>r.distEntry<eps||r.distExit<eps)
-    .sort((a,b)=>Math.min(a.distEntry,a.distExit)-Math.min(b.distEntry,b.distExit))
-    .slice(0,20);
-  showTable(
-    `Digest ${digest.toFixed(8)} — ${scored.length} near matches`,
-    ['pos','lemma','N','entry dist','exit dist'],
-    scored.map(r=>({cells:[r.pos,r.lemma,r.N,r.distEntry.toExponential(2),r.distExit.toExponential(2)],r})),
-    r=>Math.min(r.distEntry,r.distExit)<1e-5
-  );
-}
-
-function searchJStats(q){
-  const lemma=lemmatise(q);
-  const rows=DB.filter(r=>r.lemma===lemma).map(r=>derive(r));
-  if(!rows.length){showTable(`"${lemma}" — not found`,['pos','lemma','N','control','target','ctl%'],[]);return;}
-  showTable(
-    `J-stream: "${lemma}" across ${rows.length} occurrence${rows.length!==1?'s':''}`,
-    ['pos','lemma','N','control','target','ctl%','J profile'],
-    rows.map(r=>{
-      const ctl=r.absJ.filter(v=>v).length, tgt=r.N-ctl;
-      return {cells:[r.pos,r.lemma,r.N,ctl,tgt,Math.round(ctl/r.N*100)+'%',jBar(r.absJ)],r};
-    }),
-    ()=>false
-  );
-}
-
-// ── VOCAB TABLE ───────────────────────────────────────────────────────────────
-function buildVocabTable(){
-  const freq={}, minEntry={}, maxExit={}, firstAbsJ={}, minN={}, maxN={};
-  for(const rec of DB){
-    const r=derive(rec);
-    if(r.isStop) continue;
-    freq[r.lemma]=(freq[r.lemma]||0)+1;
-    if(minEntry[r.lemma]===undefined||r.entry<minEntry[r.lemma]) minEntry[r.lemma]=r.entry;
-    if(maxExit[r.lemma]===undefined||r.exit>maxExit[r.lemma])   maxExit[r.lemma]=r.exit;
-    if(minN[r.lemma]===undefined||r.N<minN[r.lemma]) minN[r.lemma]=r.N;
-    if(maxN[r.lemma]===undefined||r.N>maxN[r.lemma]) maxN[r.lemma]=r.N;
-    if(!firstAbsJ[r.lemma]) firstAbsJ[r.lemma]=r.absJ;
-  }
-  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,20);
-  const tbody=document.getElementById('vocab-body');
-  tbody.innerHTML='';
-  for(const [lemma,f] of top){
-    const tr=document.createElement('tr');
-    const firstRec=DB.find(r=>r.lemma===lemma);
-    const firstPos=firstRec?firstRec.pos:0;
-    const nRange=minN[lemma]===maxN[lemma]?`${minN[lemma]}`:`${minN[lemma]}–${maxN[lemma]}`;
-    tr.style.cursor='pointer'; tr.title='Click to view in context';
-    tr.onclick=()=>{document.getElementById('query').value=lemma;setMode('lemma');search();playContext(firstPos,lemma,12);};
-    tr.innerHTML=`<td><span class="c-blue">${lemma}</span></td><td>${f}</td><td style="color:var(--muted)">${nRange}</td><td>${jBar(firstAbsJ[lemma]||[],30)}</td>`;
-    tbody.appendChild(tr);
-  }
-}
-
-// ── GLOBAL STATS ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// GLOBAL STATS
+// ═══════════════════════════════════════════════════════════════
 function buildGlobalStats(){
-  const N=DB.length;
-  const uniqueLemmas=new Set(DB.filter(r=>!STOPS.has(r.lemma)).map(r=>r.lemma)).size;
-  const finalRec=DB[DB.length-1];
-  const finalDigest=finalRec?derive(finalRec).exit:SEED;
-  const totalDepth=DB.reduce((s,r)=>s+r.N,0);
-  const el=document.getElementById('global-stats');
-  el.innerHTML=`
-    <div class="stat"><span class="stat-k">words</span><span class="stat-v">${N}</span></div>
-    <div class="stat"><span class="stat-k">unique lemmas</span><span class="stat-v">${uniqueLemmas}</span></div>
-    <div class="stat"><span class="stat-k">total depth</span><span class="stat-v">${totalDepth.toLocaleString()}</span></div>
-    <div class="stat"><span class="stat-k">DB record</span><span class="stat-v c-green">pos · lemma · entry · N</span></div>
-    <div class="stat"><span class="stat-k">final digest</span><span class="stat-v c-blue">${finalDigest.toFixed(8)}</span></div>
+  const nOcc=CHAIN_INDEX.size;
+  const nVocab=VOCAB.size;
+  const nContent=Array.from(VOCAB.values()).filter(l=>!STOPS.has(l)).length;
+  const totalN=Array.from(CHAIN_INDEX.values()).reduce((s,r)=>s+r.N,0);
+  const finalKey=CHAIN_ORDER[CHAIN_ORDER.length-1];
+  const finalExit=finalKey?CHAIN_INDEX.get(finalKey).exitDigest:SEED;
+  document.getElementById('global-stats').innerHTML=`
+    <div class="stat" style="background:rgba(0,122,255,0.06)">
+      <span class="stat-k" style="color:var(--blue)">CHAIN_INDEX entries</span>
+      <span class="stat-v">${nOcc}</span></div>
+    <div class="stat" style="background:rgba(88,86,214,0.06)">
+      <span class="stat-k" style="color:var(--indigo)">VOCAB / WORD_TO_ID</span>
+      <span class="stat-v">${nVocab} lemmas</span></div>
+    <div class="stat" style="background:${COLLISIONS===0?'rgba(52,199,89,0.06)':'rgba(255,59,48,0.06)'}">
+      <span class="stat-k" style="color:${COLLISIONS===0?'var(--green)':'var(--red)'}">entry digest collisions</span>
+      <span class="stat-v">${COLLISIONS}</span></div>
+    <div class="stat"><span class="stat-k">content lemmas</span><span class="stat-v">${nContent}</span></div>
+    <div class="stat"><span class="stat-k">total orbit depth</span><span class="stat-v">${totalN.toLocaleString()}</span></div>
+    <div class="stat"><span class="stat-k">corpus digest</span><span class="stat-v c-blue">${finalExit.toFixed(8)}</span></div>
   `;
 }
 
-// ── CONTEXT VIEWER ───────────────────────────────────────────────────────────
-let scrollTimer=null, activeRow=null;
-
-function setActiveRow(tr){
-  if(activeRow){activeRow.style.background='';}
-  activeRow=tr;
-  if(tr) tr.style.background='rgba(0,122,255,0.10)';
-}
-
-function playContext(pos, word, window=12, triggerRow){
-  if(scrollTimer){clearInterval(scrollTimer);scrollTimer=null;}
-  if(triggerRow!==undefined) setActiveRow(triggerRow);
-  const strip=document.getElementById('context-strip');
-  const scroll=document.getElementById('ctx-scroll');
-  const info=document.getElementById('ctx-info');
-  strip.classList.remove('hidden');
-  const lemma=lemmatise(word);
-  const allOcc=DB.filter(r=>r.lemma===lemma).map(r=>r.pos);
-  const occIdx=allOcc.indexOf(pos);
-  info.textContent=`"${word}" · pos ${pos}${allOcc.length>1?' (occ '+(occIdx+1)+'/'+allOcc.length+')':''}`;
-
-  // 3 words before target, then window words after
-  const start=Math.max(0,pos-3);
-  const end=Math.min(DB.length-1,pos+window);
-  scroll.innerHTML='';
-  scroll.style.transform='translateX(0px)';
-
-  for(let i=start;i<=end;i++){
-    const r=DB[i];
-    const sp=document.createElement('span');
-    const isTarget=i===pos;
-    const isOtherOcc=allOcc.includes(i)&&!isTarget;
-    const isStop=STOPS.has(r.lemma);
-    sp.className='ctx-word '+(isTarget?'ctx-target':isOtherOcc?'ctx-other':isStop?'ctx-stop':'ctx-content');
-    sp.textContent=r.lemma+' ';
-    if(isTarget) sp.id='ctx-target-word';
-    scroll.appendChild(sp);
-  }
-
-  // Start from left, scroll slowly through the window then stop
-  requestAnimationFrame(()=>{
-    const stripW=scroll.parentElement.offsetWidth;
-    const totalW=scroll.scrollWidth;
-    let offset=0;
-    const maxOffset=Math.max(0,totalW-stripW);
-    scrollTimer=setInterval(()=>{
-      offset+=0.5;
-      if(offset>=maxOffset){
-        scroll.style.transform=`translateX(-${maxOffset}px)`;
-        clearInterval(scrollTimer);scrollTimer=null;return;
-      }
-      scroll.style.transform=`translateX(-${offset}px)`;
-    },16);
-  });
-}
-function showContext(pos,word){playContext(pos,word,12);}
-
-function stopScroll(){if(scrollTimer){clearInterval(scrollTimer);scrollTimer=null;}}
-function restartScroll(){
-  const strip=document.getElementById('context-strip');
-  if(!strip.classList.contains('hidden')){
-    const scroll=document.getElementById('ctx-scroll');
-    const stripW=scroll.parentElement.offsetWidth;
-    let offset=parseFloat(scroll.style.transform.replace('translateX(-','').replace('px)','')||'0');
-    stopScroll();
-    scrollTimer=setInterval(()=>{
-      offset+=0.4;
-      const maxOffset=scroll.scrollWidth-stripW;
-      if(offset>=maxOffset){clearInterval(scrollTimer);scrollTimer=null;return;}
-      scroll.style.transform=`translateX(-${offset}px)`;
-    },16);
-  }
-}
-
-// ── INIT ─────────────────────────────────────────────────────────────────────
-const CHAPTER_1=`Alice was beginning to get very tired of sitting by her sister on the bank
+// ═══════════════════════════════════════════════════════════════
+// CORPUS + INIT
+// ═══════════════════════════════════════════════════════════════
+const CORPUS=`Alice was beginning to get very tired of sitting by her sister on the bank
 and of having nothing to do once or twice she had peeped into the book her
 sister was reading but it had no pictures or conversations in it and what
 is the use of a book thought Alice without pictures or conversations
@@ -560,14 +745,14 @@ She was close behind it when she turned the corner but the Rabbit was no longer
 to be seen she found herself in a long low hall which was lit up by a row of
 lamps hanging from the roof`;
 
-buildDB(CHAPTER_1).then(()=>{
+buildDB(CORPUS).then(()=>{
   document.getElementById('build-progress').classList.add('hidden');
   document.getElementById('main').classList.remove('hidden');
   buildGlobalStats();
-  buildVocabTable();
-  // Default search
+  setMode('lemma');
+  travBuild(dkey(SEED));
   document.getElementById('query').value='alice';
-  searchLemma('alice');
+  modeLemma('alice');
 });
 </script>
 
